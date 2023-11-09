@@ -36,7 +36,7 @@ U = topt.variable(1,N)
 cost = 0
 
 for i in range(N):
-    topt.subject_to( X[:,i+1] == X[:,i] + delta * vertcat(X[2:4,i], f1(X[:,i], U[0,i]), f2(X[:,i], U[0,i])) )
+    X[:,i+1] = X[:,i] + delta * vertcat(X[2:4,i], f1(X[:,i], U[0,i]), f2(X[:,i], U[0,i]))
     cost += U[0,i]**2
 
 topt.subject_to( X[:,0] == x[:, 0] )
