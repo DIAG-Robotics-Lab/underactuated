@@ -4,20 +4,18 @@ import casadi as cs
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-topt = cs.Opti()
-topt.solver("ipopt")
+opt = cs.Opti()
+opt.solver("ipopt")
 
 # parameters
-M = 20       # number of samples per shot
-num = 20     # number of shooting points
-N = M*num
+N = 200
 delta = 0.01
 g = 9.81
 
 # trajectory
 u = np.zeros(N)
 x = np.zeros((4,N+1))
-#x[0,0] = math.pi*0.6
+#x[1,0] = math.pi*2
 
 # cart pole
 l, m1, m2, b1, b2 = (1, 10, 5, 0, 0)
@@ -39,95 +37,32 @@ f2 = lambda q, u: (- m12(q, u) * line1(q, u) + m11(q, u) * line2(q, u)) / (m11(q
 f = lambda x, u: cs.vertcat( x[2:4], f1(x, u), f2(x, u) )
 F = lambda x, u: np.hstack( (x[2:4], f1(x, u), f2(x, u)) )"""
 
-# terminal state
-#term_pos = np.array((math.pi, 0))
-term_pos = np.array(math.pi)
-term_vel = np.array((0, 0))
+X = opt.variable(4,N+1)
+U = opt.variable(1,N+1)
 
-def direct_transcription():
-  X = topt.variable(4,N+1)
-  U = topt.variable(1,N)
-  cost = 0
+cost = 0
+for i in range(N):
+  # multiple shooting
+  opt.subject_to( X[:,i+1] == X[:,i] + delta * f(X[:,i], U[0,i]) )
 
-  for i in range(N):
-    topt.subject_to( X[:,i+1] == X[:,i] + delta * f(X[:,i], U[0,i]) )
-    cost += U[0,i]**2
+  #single shooting
+  #X[:,i+1] = X[:,i] + delta * f(X[:,i], U[0,i])
 
-  topt.subject_to( X[:,0] == x[:, 0] )
-  topt.subject_to( X[1,N] == math.pi )
-  #topt.subject_to( X[0:2,N] == term_pos )
-  topt.subject_to( X[2:4,N] == term_vel )
-
-  topt.minimize(cost)
-
-  sol = topt.solve()
-  return sol.value(U)
+  #direct collocation
+  #opt.subject_to( X[:,i+1] == X[:,i] + (delta/6) * (f(X[:,i], U[0,i]) + 4 * f((X[:,i]+X[:,i+1])/2 + (f(X[:,i], U[0,i])+f(X[:,i+1], U[0,i+1]))*delta/8, (U[0,i]+U[0,i+1])/2) + f(X[:,i+1], U[0,i+1])) )
   
-def single_shooting():
-  X = topt.variable(4,N+1)
-  U = topt.variable(1,N)
-  cost = 0
+  # sum running cost
+  cost += U[0,i]**2
 
-  for i in range(N):
-    X[:,i+1] = X[:,i] + delta * f(X[:,i], U[0,i])
-    cost += U[0,i]**2
+opt.subject_to( X[:,0] == x[:, 0] )
+opt.subject_to( X[1,N] == math.pi )
+#opt.subject_to( X[0:2,N] == np.array((math.pi, 0)) )
+opt.subject_to( X[2:4,N] == np.array((0, 0)) )
 
-  topt.subject_to( X[:,0] == x[:, 0] )
-  #topt.subject_to( X[1,N] == math.pi )
-  topt.subject_to( X[0:2,N] == term_pos )
-  topt.subject_to( X[2:4,N] == term_vel )
+opt.minimize(cost)
 
-  topt.minimize(cost)
-
-  sol = topt.solve()
-  return sol.value(U)
-  
-def multiple_shooting():
-  X = []
-  U = topt.variable(1,N)
-  cost = 0
-
-  for j in range(num):
-    X.append(topt.variable(4,M+1))
-    for i in range(M):
-      X[j][:,i+1] = X[j][:,i] + delta * f(X[j][:,i], U[0,j*M+i])
-        
-  for j in range(num-1):
-    topt.subject_to( X[j][:,M] == X[j+1][:,0] )
-        
-  for i in range(N):
-    cost += U[0,i]**2
-
-  topt.subject_to( X[0][:,0] == x[:, 0] )
-  #topt.subject_to( X[num-1][1,M] == math.pi )
-  topt.subject_to( X[num-1][0:2,M] == term_pos )
-  topt.subject_to( X[num-1][2:4,M] == term_vel )
-
-  topt.minimize(cost)
-
-  sol = topt.solve()
-  return sol.value(U)
-  
-def direct_collocation():
-  X = topt.variable(4,N+1)
-  U = topt.variable(1,N+1)
-  cost = 0
-
-  for i in range(N):
-    topt.subject_to( X[:,i+1] == X[:,i] + (delta/6) * (f(X[:,i], U[0,i]) + 4 * f((X[:,i]+X[:,i+1])/2 + (f(X[:,i], U[0,i])+f(X[:,i+1], U[0,i+1]))*delta/8, (U[0,i]+U[0,i+1])/2) + f(X[:,i+1], U[0,i+1])) )
-    cost += U[0,i]**2
-
-  topt.subject_to( X[:,0] == x[:, 0] )
-  #topt.subject_to( X[1,N] == math.pi )
-  topt.subject_to( X[0:2,N] == term_pos )
-  topt.subject_to( X[2:4,N] == term_vel )
-
-  topt.minimize(cost)
-
-  sol = topt.solve()
-  return sol.value(U)
-
-u = direct_transcription()
+sol = opt.solve()
+u = sol.value(U)
 
 # integrate
 for i in range(N):
