@@ -1,33 +1,26 @@
 import numpy as np
 import sympy as sp
 import matplotlib.pyplot as plt
-import math
+from casadi import *
 
-delta = 0.01
+delta = 0.1
 N = 100
-n, m = (4, 1)
-Q = np.eye(n)
-R = np.eye(m)
-Qter = 100 * np.eye(n)
+Q = np.eye(3)
+R = np.eye(2)
+Qter = 100 * np.eye(3)
 iterations = 100
+n, m = (3, 2)
 alpha = 0.9
-g = 9.81
 
-u = np.array([0.1 * np.ones(N)], dtype='float32')
-x = np.zeros((n, N+1), dtype='float32')
-x[:, 0] = np.array([0, 0, 0, 0])
+x = np.zeros((n, N+1))
+x[:, 0] = np.array([0, 1, 0])
 
 # dynamics and derivatives
-x0, x1, x2, x3, u0 = sp.symbols('x0 x1 x2 x3 u0')
-X = sp.Matrix([[x0], [x1], [x2], [x3]])
-U = sp.Matrix([[u0]])
+x0, x1, x2, u0, u1 = sp.symbols('x0 x1 x2 u0 u1')
+X = sp.Matrix([[x0], [x1], [x2]])
+U = sp.Matrix([[u0], [u1]])
 
-# cart pole
-l, m1, m2, b1, b2 = (1, 10, 5, 0, 0)
-f1_sym = (l*m2*sp.sin(X[1])*X[3]**2 + U[0] + m2*g*sp.cos(X[1])*sp.sin(X[1])) / (m1 + m2*(1-sp.cos(X[1])**2)) - b1*X[2]
-f2_sym = - (l*m2*sp.cos(X[1])*sp.sin(X[1])*X[3]**2 + U[0]*sp.cos(X[1]) + (m1+m2)*g*sp.sin(X[1])) / (l*m1 + l*m2*(1-sp.cos(X[1])**2)) - b2*X[3]
-f_sym = sp.Matrix([[X[2]], [X[3]], [f1_sym], [f2_sym]])
-
+f_sym = sp.Matrix([[X[0] + delta * U[0] * sp.cos(X[2])], [X[1] + delta * U[0] * sp.sin(X[2])], [X[2] + delta * U[1]]])
 f = sp.lambdify([X, U], f_sym, 'numpy')
 fx = sp.lambdify([X, U], f_sym.jacobian(X), 'numpy')
 fu = sp.lambdify([X, U], f_sym.jacobian(U), 'numpy')
@@ -40,13 +33,14 @@ Lxx = sp.lambdify([X, U], L_sym.jacobian(X).jacobian(X), 'numpy')
 Lux = sp.lambdify([X, U], L_sym.jacobian(U).jacobian(X), 'numpy')
 Luu = sp.lambdify([X, U], L_sym.jacobian(U).jacobian(U), 'numpy')
 
-#L_ter_sym = Qter * (X[1] - math.pi)**2
 L_ter_sym = X.T * Qter * X
 L_ter = sp.lambdify([X], L_ter_sym, 'numpy')
 L_terx = sp.lambdify([X], L_ter_sym.jacobian(X), 'numpy')
 L_terxx = sp.lambdify([X], L_ter_sym.jacobian(X).jacobian(X), 'numpy')
 
 # integrate initial guess
+u = np.array([0.15 * np.ones(N), -0.3 * np.ones(N)])
+
 cost = 0
 for i in range(N):
   x[:, i+1] = f(x[:, i], u[:, i]).flatten()
@@ -96,7 +90,7 @@ for iter in range(iterations):
   plt.plot(x[0, :], x[1, :], color=[0, 0, 1, iter / iterations])
 
 xcheck = np.zeros((n, N+1))
-xcheck[:, 0] = np.array([0, 0, 0, 0])
+xcheck[:, 0] = np.array([0, 1, 0])
 for i in range(N):
   xcheck[:, i+1] = f(xcheck[:, i], u[:, i]).flatten()
 

@@ -3,8 +3,6 @@ import math
 import casadi as cs
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
-from matplotlib.patches import Polygon
-from matplotlib.transforms import Affine2D
 
 opt = cs.Opti()
 opt.solver("ipopt")
@@ -12,7 +10,7 @@ opt.solver("ipopt")
 # parameters
 n_s = 6 # state: px, pz, theta, vx, vz, omega
 n_i = 4 # input: f1x, f1z, f2x, f2z
-N = 500
+N = 1000
 delta = 0.01
 g = 9.81
 height = 1
@@ -20,7 +18,7 @@ height = 1
 # trajectory
 u = np.zeros((n_i,N))
 x = np.zeros((n_s,N+1))
-x[:,0] = (1, 1, 0, 0, 0, 0)
+x[:,0] = (0, 1, 0, 0, 0, 0)
 
 # cart pole
 m, w, I = (1, 1, 1)
@@ -46,9 +44,10 @@ for i in range(N):
   opt.subject_to( X[1,i] == height )
   
   # balance
-  cost += U[0,i]**2 + U[2,i]**2 + (U[1,i] - m*g/2)**2 + (U[3,i] - m*g/2)**2 + X[:,i].T @ X[:,i]
+  cost += U[0,i]**2 + U[2,i]**2 + (U[1,i] - m*g/2)**2 + (U[3,i] - m*g/2)**2 + 100*X[2,i]**2 #X[:,i].T @ X[:,i]
 
 opt.subject_to( X[:,0] == x[:, 0] )
+opt.subject_to( X[:,int(N/2)] == np.array((1, 1, 0, 0, 0, 0)) )
 opt.subject_to( X[:,N] == np.array((0, 1, 0, 0, 0, 0)) )
 
 opt.minimize(cost)
@@ -63,8 +62,8 @@ for i in range(N):
 # display cart pendulum
 def animate(i):
   plt.clf()
-  plt.xlim((-5, 5))
-  plt.ylim((-0.1, 3.0))
+  plt.xlim((-2, 2))
+  plt.ylim((-0.5, 2.0))
   plt.gca().set_aspect('equal')
   
   force_scale = 0.2
@@ -74,6 +73,7 @@ def animate(i):
   
   plt.plot(np.array((-w/2, w/2)), np.array((0, 0)), 'k')
   plt.plot(np.array((0, x[0,i])), np.array((0, x[1,i])), 'k')
+  plt.plot(np.array((x[0,i], x[0,i])), np.array((0, x[1,i])), 'k--')
   plt.plot(x[0,i] + vertices[0,:], x[1,i] +  + vertices[1,:], 'k')
   
   plt.plot(np.array((- w/2, - w/2 + force_scale * u[0,i])), force_scale * np.array((0, u[1,i])), 'r')
