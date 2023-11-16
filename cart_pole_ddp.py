@@ -9,7 +9,7 @@ n, m = (4, 1)
 N = 100
 Q = np.eye(n)
 R = np.eye(m)
-Qter = 100 * np.eye(n)
+Qter = 1000 * np.eye(n)
 iterations = 100
 g = 9.81
 
@@ -26,11 +26,8 @@ l, m1, m2, b1, b2 = (1, 10, 5, 0, 0)
 f1 = lambda x, u: (l*m2*cs.sin(x[1])*x[3]**2 + u + m2*g*cs.cos(x[1])*cs.sin(x[1])) / (m1 + m2*(1-cs.cos(x[1])**2)) - b1*x[2]
 f2 = lambda x, u: - (l*m2*cs.cos(x[1])*cs.sin(x[1])*x[3]**2 + u*cs.cos(x[1]) + (m1+m2)*g*cs.sin(x[1])) / (l*m1 + l*m2*(1-cs.cos(x[1])**2)) - b2*x[3]
 f_ = lambda x, u: x + delta * cs.vertcat( x[2:4], f1(x, u), f2(x, u) )
-#f_ = lambda x, u: x + delta * cs.vertcat( u[0] * np.cos(x[2]), u[0] * np.sin(x[2]), u[1] )
 L_ = lambda x, u: x.T @ Q @ x + u.T @ R @ u
-#L_ter_ = lambda x_ter: (x_ter - np.array([math.pi, 0, 0, 0])).T @ Qter @ (x_ter - np.array([math.pi, 0, 0, 0]))
-L_ter_ = lambda x_ter: 100 * (x_ter[0]**2 + x_ter[2]**2 + x_ter[3]**2)
-#L_ter_ = lambda x_ter: x_ter.T @ Qter @ x_ter
+L_ter_ = lambda x_ter: 1000 * ((x_ter[1] - math.pi)**2 + x_ter[2]**2 + x_ter[3]**2)
 
 f = cs.Function('f', [X, U], [f_(X,U)])
 L = cs.Function('L', [X, U], [L_(X,U)])
@@ -45,7 +42,7 @@ Luu = cs.Function('Luu', [X, U], [cs.jacobian(cs.jacobian(L_(X,U), U).T, U)])
 L_terx = cs.Function('L_terx', [X], [cs.jacobian(L_ter_(X), X)])
 L_terxx = cs.Function('L_terxx', [X], [cs.jacobian(cs.jacobian(L_ter_(X), X), X)])
 
-u = np.array([1 * np.ones(N)])
+u = np.array([0.1 * np.ones(N)])
 
 cost = 0
 for i in range(N):
@@ -56,8 +53,6 @@ cost = cost + L_ter(x[:, N])
 
 k = [np.array((m, 1))] * (N+1)
 K = [np.array((m, n))] * (N+1)
-
-#plt.figure()
 
 for iter in range(iterations):
   V = np.zeros(N+1)
@@ -93,15 +88,10 @@ for iter in range(iterations):
   u = unew
   x = xnew
 
-  #plt.plot(x[0, :], x[1, :], color=[0, 0, 1, iter / iterations])
-
 xcheck = np.zeros((n, N+1))
 xcheck[:, 0] = np.array([0, 0, 0, 0])
 for i in range(N):
   xcheck[:, i+1] = np.array(f(xcheck[:, i], u[:, i])).flatten()
-
-#plt.plot(xcheck[0, :], xcheck[1, :], 'k')
-#plt.axis([-0.5, 3.5, -0.5, 1.5])
 
 def animate(i):
   np.set_printoptions(precision=2)
