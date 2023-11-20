@@ -4,10 +4,10 @@ import casadi as cs
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-#opt = cs.Opti()
-#opt.solver("qpoases")
-opt = cs.Opti('conic')
-opt.solver('ooqp')
+opt = cs.Opti()
+opt.solver('ipopt')
+#opt = cs.Opti('conic')
+#opt.solver('ooqp')
 
 # parameters
 N = 1000
@@ -27,6 +27,9 @@ f = lambda x, u: (np.vstack((np.hstack((A_lip, np.zeros((3,3)))), np.hstack((np.
                   np.vstack((np.hstack((B_lip, np.zeros((3,1)))), np.hstack((np.zeros((3,1)), B_lip)))) @ u)
 
 # bounds
+zmp_x_mid = np.array( [(i//100)*0.1 for i in range(N)] )
+zmp_y_mid = np.array( [(((i%200)<100)-0.5)*0.1 for i in range(N)] )
+
 zmp_x_max = np.array( [(i//100)*0.1 + 0.1 for i in range(N)] )
 zmp_x_min = np.array( [(i//100)*0.1 - 0.1 for i in range(N)] )
 zmp_y_max = np.array( [(((i%200)<100)-0.5)*0.1 + 0.1 for i in range(N)] )
@@ -38,7 +41,7 @@ X = opt.variable(6,N+1)
 cost = 0
 for i in range(N):
   opt.subject_to( X[:,i+1] == X[:,i] + delta * f(X[:,i], U[:,i]) )
-  cost += U[0,i]**2
+  cost += U[0,i]**2 + (X[2,i]-zmp_x_mid[i])**2 + (X[5,i]-zmp_y_mid[i])**2
   
   opt.subject_to( X[2,i+1] <= zmp_x_max[i] )
   opt.subject_to( X[2,i+1] >= zmp_x_min[i] )
@@ -56,8 +59,8 @@ u = sol.value(U)
 x = sol.value(X)
 
 # integrate
-#for i in range(N):
-  #x[:,i+1] = x[:,i] + delta * f(x[:,i], u[i,:])
+for i in range(N):
+  x[:,i+1] = x[:,i] + delta * f(x[:,i], u[i,:])
 
 # display
 def animate(i):
