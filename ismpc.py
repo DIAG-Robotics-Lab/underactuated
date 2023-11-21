@@ -4,10 +4,10 @@ import casadi as cs
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-opt = cs.Opti()
-opt.solver('ipopt')
-#opt = cs.Opti('conic')
-#opt.solver('ooqp')
+#opt = cs.Opti()
+#opt.solver('ipopt')
+opt = cs.Opti('conic')
+opt.solver('osqp')
 
 # parameters
 N = 1000
@@ -17,8 +17,8 @@ h = 0.75
 eta = math.sqrt(g/h)
 
 # trajectory
-u = np.zeros((2,N))
-x = np.zeros((6,N+1))
+#u = np.zeros((2,N))
+#x = np.zeros((6,N+1))
 
 # lip model
 A_lip = np.array([[0,1,0],[eta**2,0,-eta**2],[0,0,0]])
@@ -41,14 +41,16 @@ X = opt.variable(6,N+1)
 cost = 0
 for i in range(N):
   opt.subject_to( X[:,i+1] == X[:,i] + delta * f(X[:,i], U[:,i]) )
-  cost += U[0,i]**2 + (X[2,i]-zmp_x_mid[i])**2 + (X[5,i]-zmp_y_mid[i])**2
+  #X[:,i+1] == X[:,i] + delta * f(X[:,i], U[:,i])
+  #cost += U[0,i]**2 + U[1,i]**2 + (X[2,i]-zmp_x_mid[i])**2 + (X[5,i]-zmp_y_mid[i])**2
+  cost += (X[2,i]-zmp_x_mid[i])**2 + (X[5,i]-zmp_y_mid[i])**2
   
   opt.subject_to( X[2,i+1] <= zmp_x_max[i] )
   opt.subject_to( X[2,i+1] >= zmp_x_min[i] )
   opt.subject_to( X[5,i+1] <= zmp_y_max[i] )
   opt.subject_to( X[5,i+1] >= zmp_y_min[i] )
 
-opt.subject_to( X[:,0] == x[:, 0] )
+opt.subject_to( X[:,0] == (0,0,0,0,0,0) )
 opt.subject_to( X[0,N] == X[2,N] )
 opt.subject_to( X[3,N] == X[5,N] )
 
@@ -59,8 +61,8 @@ u = sol.value(U)
 x = sol.value(X)
 
 # integrate
-for i in range(N):
-  x[:,i+1] = x[:,i] + delta * f(x[:,i], u[i,:])
+#for i in range(N):
+#  x[:,i+1] = x[:,i] + delta * f(x[:,i], u[i,:])
 
 # display
 def animate(i):
