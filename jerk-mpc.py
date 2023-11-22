@@ -23,6 +23,10 @@ B_lip = np.array([[0],[0],[1]])
 f = lambda x, u: (np.vstack((np.hstack((A_lip, np.zeros((3,3)))), np.hstack((np.zeros((3,3)), A_lip)))) @ x +
                   np.vstack((np.hstack((B_lip, np.zeros((3,1)))), np.hstack((np.zeros((3,1)), B_lip)))) @ u)
 
+A_lip_d = np.identity(3) + delta * A_lip
+B_lip_d = delta * B_lip
+f_ = lambda x, u: A_lip @ x + B_lip @ u
+
 # bounds
 zmp_x_mid = np.array( [(i//100)*0.1 for i in range(N_sim)] )
 zmp_y_mid = np.array( [(((i%200)<100)-0.5)*0.1 for i in range(N_sim)] )
@@ -33,7 +37,7 @@ zmp_y_max = np.array( [(((i%200)<100)-0.5)*0.1 + 0.1 for i in range(N_sim)] )
 zmp_y_min = np.array( [(((i%200)<100)-0.5)*0.1 - 0.1 for i in range(N_sim)] )
 
 for j in range(N_sim-N):
-  
+  start_time = time.time()
   opt = cs.Opti('conic')
   opt.solver('proxqp')
   
@@ -42,21 +46,17 @@ for j in range(N_sim-N):
   
   U = opt.variable(2,N)
   X = opt.variable(6,N+1)
-  
-  start_time = time.time()
+
   #cost = 0
   cost = U[0,:] @ U[0,:].T + U[1,:] @ U[1,:].T
   for i in range(N):
-    opt.subject_to( X[:,i+1] == X[:,i] + delta * f(X[:,i], U[:,i]) )
-    #X[:,i+1] == X[:,i] + delta * f(X[:,i], U[:,i])
-    #cost += U[0,i]**2 + U[1,i]**2
-    #cost += U[0,i]**2 + U[1,i]**2 + (X[2,i]-zmp_x_mid[j+i])**2 + (X[5,i]-zmp_y_mid[j+i])**2
+    #opt.subject_to( X[:,i+1] == X[:,i] + delta * f(X[:,i], U[:,i]) )
+    X[:,i+1] == X[:,i] + delta * f(X[:,i], U[:,i])
   
-    #opt.subject_to( X[2,i+1] <= zmp_x_max[j+i] )
-    #opt.subject_to( X[2,i+1] >= zmp_x_min[j+i] )
-    #opt.subject_to( X[5,i+1] <= zmp_y_max[j+i] )
-    #opt.subject_to( X[5,i+1] >= zmp_y_min[j+i] )
-  end_time = time.time()
+  opt.subject_to( X[2,1:].T <= zmp_x_max[j:j+N] )
+  opt.subject_to( X[2,1:].T >= zmp_x_min[j:j+N] )
+  opt.subject_to( X[5,1:].T <= zmp_y_max[j:j+N] )
+  opt.subject_to( X[5,1:].T >= zmp_y_min[j:j+N] )
 
   opt.subject_to( X[:,0] == x[:,j] )
   opt.subject_to( X[0,N] == X[2,N] )
@@ -72,7 +72,7 @@ for j in range(N_sim-N):
   u[:,j] = u_[:,0]
   x[:,j+1] = x_[:,1]
   
-
+  end_time = time.time()
   elapsed_time = end_time - start_time
 
   print(f"My function took {elapsed_time} seconds to execute.")
