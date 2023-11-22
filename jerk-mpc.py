@@ -32,7 +32,7 @@ zmp_y_mid = np.array( [(((i%200)<100)-0.5)*0.1 for i in range(N_sim)] )
 
 # optimization problem
 opt = cs.Opti('conic')
-opt.solver('osqp')
+opt.solver('proxqp')
 
 U = opt.variable(2,N)
 X = opt.variable(6,N+1)
@@ -42,7 +42,8 @@ zmp_x_mid_param = opt.parameter(N)
 zmp_y_mid_param = opt.parameter(N)
 
 for i in range(N):
-  opt.subject_to( X[:,i+1] == X[:,i] + delta * f(X[:,i], U[:,i]) )
+  #opt.subject_to( X[:,i+1] == X[:,i] + delta * f(X[:,i], U[:,i]) )
+  X[:,i+1] == X[:,i] + delta * f(X[:,i], U[:,i])
 
 cost = 0.1*cs.sumsqr(U[0,:]) + 0.1*cs.sumsqr(U[1,:]) + \
     cs.sumsqr(X[2, 1:].T - zmp_x_mid_param) + \
@@ -53,7 +54,7 @@ opt.subject_to( X[2,1:].T >= zmp_x_mid_param - 0.1 )
 opt.subject_to( X[5,1:].T <= zmp_y_mid_param + 0.1 )
 opt.subject_to( X[5,1:].T >= zmp_y_mid_param - 0.1 )
 
-opt.subject_to( X[:,0] ==  x0_param)
+opt.subject_to( X[:,0] ==  x0_param )
 opt.subject_to( X[0,N] == X[2,N] )
 opt.subject_to( X[3,N] == X[5,N] )
 
