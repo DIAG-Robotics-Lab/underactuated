@@ -1,5 +1,6 @@
 import numpy as np
 import math
+import scipy
 import casadi as cs
 import animation
 import model
@@ -35,16 +36,30 @@ for i in range(N):
 
 # initial and terminal state
 opt.subject_to( X[:,0] == x0_param )
+x_term = np.array([[math.pi], [0], [0], [0]])
 #opt.subject_to( X[(1,2,3),N] == (math.pi, 0, 0) )
-opt.subject_to( X[(0,1,2,3),N] == (math.pi, 0, 0, 0) )
+#opt.subject_to( X[(0,1,2,3),N] == (math.pi, 0, 0, 0) )
 
 # input constraint
 #opt.subject_to( U <=   np.ones((1,N)) * u_max )
 #opt.subject_to( U >= - np.ones((1,N)) * u_max )
 
 # cost function
-wu, wx0, wx1, wx2, wx3 = (1, 0, 0, 0, 0)
-cost = wu*cs.sumsqr(U) + wx0*cs.sumsqr(X[0,:]) + wx1*cs.sumsqr(X[1,:]) + wx2*cs.sumsqr(X[2,:]) + wx3*cs.sumsqr(X[3,:])
+X_lqr = opt.variable(4)
+U_lqr = opt.variable(1)
+
+fx = cs.Function('fx', [X_lqr, U_lqr], [cs.jacobian(f(X_lqr,U_lqr), X_lqr)])
+fu = cs.Function('fu', [X_lqr, U_lqr], [cs.jacobian(f(X_lqr,U_lqr), U_lqr)])
+
+# solve LQR
+A = np.array(fx([math.pi, 0, 0, 0], 0))
+B = np.array(fu([math.pi, 0, 0, 0], 0))
+R = np.identity(1)
+Q = np.identity(4)
+P = scipy.linalg.solve_continuous_are(A, B, Q, R)
+
+wu, wx0, wx1, wx2, wx3 = (1, 1, 1, 1, 1)
+cost = wu*cs.sumsqr(U) + wx0*cs.sumsqr(X[0,:]) + wx1*cs.sumsqr(X[1,:]) + wx2*cs.sumsqr(X[2,:]) + wx3*cs.sumsqr(X[3,:]) + (X[:,N] - x_term).T @ P @ (X[:,N] - x_term)
 opt.minimize(cost)
 
 # iterate
