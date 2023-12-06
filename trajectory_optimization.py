@@ -6,7 +6,9 @@ import model
 import time
 
 opt = cs.Opti()
-opt.solver("ipopt")
+p_opts = {"ipopt.print_level": 0, "expand": True}
+s_opts = {} #{"max_iter": 1000}
+opt.solver("ipopt", p_opts, s_opts)
 
 # parameters
 N = 200
