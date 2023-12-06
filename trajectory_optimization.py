@@ -54,7 +54,7 @@ for i in range(N):
 elapsed_time = time.time() - start_time
 
 print('Total cost: ', cs.sumsqr(u))
-print('Average computation time: ', np.mean(elapsed_time)*1000, ' ms')
+print('Computation time: ', elapsed_time*1000, ' ms')
 
 # display
 #animation.animate_cart_pendulum(N, x, u, p)

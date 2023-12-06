@@ -3,6 +3,7 @@ import math
 import matplotlib.pyplot as plt
 import casadi as cs
 from matplotlib.animation import FuncAnimation
+import time
 
 delta = 0.1
 n, m = (4, 1)
@@ -47,53 +48,61 @@ u = np.array([0.1 * np.ones(N)])
 cost = 0
 for i in range(N):
   x[:, i+1] = np.array(f(x[:,i], u[:,i])).flatten()
-  cost = cost + L(x[:, i], u[:,i])
+  cost = cost + L(x[:,i], u[:,i])
 
 cost = cost + L_ter(x[:, N])
 
 k = [np.array((m, 1))] * (N+1)
 K = [np.array((m, n))] * (N+1)
 
+V = np.zeros(N+1)
+Vx = np.zeros((n,N+1))
+Vxx = np.zeros((n,n,N+1))
+
 for iter in range(iterations):
-  V = np.zeros(N+1)
-  V[N] = L_ter(x[:, N])
-  Vx = np.zeros((n, N+1))
-  Vx[:, N] = L_terx(x[:, N])
-  Vxx = np.zeros((n, n, N+1))
-  Vxx[:, :, N] = L_terxx(x[:, N])
+  start_time = time.time()
+
+  V[N] = L_ter(x[:,N])
+  Vx[:, N] = L_terx(x[:,N])
+  Vxx[:, :, N] = L_terxx(x[:,N])
 
   for i in reversed(range(N)):
-    Qx = np.array(Lx(x[:, i], u[:,i])).flatten() + fx(x[:, i], u[:,i]).T @ Vx[:, i + 1]
-    Qu = np.array(Lu(x[:, i], u[:,i])).flatten() + fu(x[:, i], u[:,i]).T @ Vx[:, i + 1]
+    fx_ = fx(x[:,i], u[:,i])
+    fu_ = fu(x[:,i], u[:,i])
 
-    Qxx = Lxx(x[:, i], u[:,i]) + fx(x[:, i], u[:,i]).T @ Vxx[:, :, i + 1] @ fx(x[:, i], u[:,i])
-    Qux = Lux(x[:, i], u[:,i]) + fu(x[:, i], u[:,i]).T @ Vxx[:, :, i + 1] @ fx(x[:, i], u[:,i])
-    Quu = Luu(x[:, i], u[:,i]) + fu(x[:, i], u[:,i]).T @ Vxx[:, :, i + 1] @ fu(x[:, i], u[:,i])
+    Qx = np.array(Lx(x[:,i], u[:,i])).flatten() + fx_.T @ Vx[:,i+1]
+    Qu = np.array(Lu(x[:,i], u[:,i])).flatten() + fu_.T @ Vx[:,i+1]
 
-    k[i] = -np.linalg.inv(Quu) @ Qu
-    K[i] = -np.linalg.inv(Quu) @ Qux
+    Qxx = Lxx(x[:,i], u[:,i]) + fx_.T @ Vxx[:,:,i+1] @ fx_
+    Qux = Lux(x[:,i], u[:,i]) + fu_.T @ Vxx[:,:,i+1] @ fx_
+    Quu = Luu(x[:,i], u[:,i]) + fu_.T @ Vxx[:,:,i+1] @ fu_
 
-    V[i] = V[i + 1] - 0.5 * k[i].T @ Quu @ k[i]
+    Quu_inv = np.linalg.inv(Quu)
+    k[i] = - Quu_inv @ Qu
+    K[i] = - Quu_inv @ Qux
+
+    V[i] = V[i+1] - 0.5 * k[i].T @ Quu @ k[i]
     Vx[:, i] = np.array(Qx - K[i].T @ Quu @ k[i]).flatten()
-    Vxx[:, :, i] = Qxx - K[i].T @ Quu @ K[i]
+    Vxx[:,:,i] = Qxx - K[i].T @ Quu @ K[i]
 
   xnew = np.zeros((n, N+1))
-  xnew[:, 0] = x[:, 0]
-  unew = np.zeros((m, N))
+  xnew[:,0] = x[:,0]
 
   for i in range(N):
-    unew[:, i] = u[:,i] + alpha * k[i] + K[i] @ (xnew[:, i] - x[:, i])
-    xnew[:, i+1] = np.array(f(xnew[:, i], unew[:, i])).flatten()
+    u[:,i] = u[:,i] + alpha * k[i] + K[i] @ (xnew[:,i] - x[:,i])
+    xnew[:,i+1] = np.array(f(xnew[:,i], u[:,i])).flatten()
 
-  u = unew
   x = xnew
 
-xcheck = np.zeros((n, N+1))
-xcheck[:, 0] = np.array([0, 0, 0, 0])
-for i in range(N):
-  xcheck[:, i+1] = np.array(f(xcheck[:, i], u[:, i])).flatten()
+  elapsed_time = time.time() - start_time
+  print('Iteration time: ', elapsed_time*1000, ' ms')
 
-def animate(i):
+xcheck = np.zeros((n, N+1))
+xcheck[:,0] = np.array([0, 0, 0, 0])
+for i in range(N):
+  xcheck[:, i+1] = np.array(f(xcheck[:,i], u[:,i])).flatten()
+
+"""def animate(i):
   np.set_printoptions(precision=2)
 
   plt.clf()
@@ -106,6 +115,6 @@ def animate(i):
   plt.plot(np.array((x[0,:][i], x[0,:][i] + math.sin(x[1,:][i]))), np.array((0, - math.cos(x[1,:][i]))))
 
 ani = FuncAnimation(plt.gcf(), animate, frames=N+1, repeat=False, interval=0)
-plt.show()
+plt.show()"""
 
 
