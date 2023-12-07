@@ -5,7 +5,8 @@ from collections import namedtuple
 def get_cart_pendulum_model():
   g = 9.81
   Parameters = namedtuple('Parameters', ['l', 'm1', 'm2', 'b1', 'b2'])
-  p = Parameters(l=1, m1=2, m2=1, b1=0, b2=0)
+  #p = Parameters(l=1, m1=2, m2=1, b1=0, b2=0)
+  p = Parameters(l=1, m1=10, m2=5, b1=0, b2=0)
   f1 = lambda x, u: (p.l*p.m2*cs.sin(x[1])*x[3]**2 + u + p.m2*g*cs.cos(x[1])*cs.sin(x[1])) / (p.m1 + p.m2*(1-cs.cos(x[1])**2)) - p.b1*x[2]
   f2 = lambda x, u: - (p.l*p.m2*cs.cos(x[1])*cs.sin(x[1])*x[3]**2 + u*cs.cos(x[1]) + (p.m1+p.m2)*g*cs.sin(x[1])) / (p.l*p.m1 + p.l*p.m2*(1-cs.cos(x[1])**2)) - p.b2*x[3]
   f = lambda x, u: cs.vertcat( x[2:4], f1(x, u), f2(x, u) )

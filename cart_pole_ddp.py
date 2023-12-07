@@ -2,16 +2,17 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 import casadi as cs
-from matplotlib.animation import FuncAnimation
 import time
+import model
+import animation
 
-delta = 0.1
+delta = 0.01
 n, m = (4, 1)
 N = 100
 Q = np.eye(n)
 R = np.eye(m)
 Qter = 1000 * np.eye(n)
-iterations = 20
+iterations = 100
 g = 9.81
 
 alpha = 0.9
@@ -23,12 +24,13 @@ opt = cs.Opti()
 X = opt.variable(4)
 U = opt.variable(1)
 
-l, m1, m2, b1, b2 = (1, 10, 5, 0, 0)
-f1 = lambda x, u: (l*m2*cs.sin(x[1])*x[3]**2 + u + m2*g*cs.cos(x[1])*cs.sin(x[1])) / (m1 + m2*(1-cs.cos(x[1])**2)) - b1*x[2]
-f2 = lambda x, u: - (l*m2*cs.cos(x[1])*cs.sin(x[1])*x[3]**2 + u*cs.cos(x[1]) + (m1+m2)*g*cs.sin(x[1])) / (l*m1 + l*m2*(1-cs.cos(x[1])**2)) - b2*x[3]
-f_ = lambda x, u: x + delta * cs.vertcat( x[2:4], f1(x, u), f2(x, u) )
 L_ = lambda x, u: x.T @ Q @ x + u.T @ R @ u
-L_ter_ = lambda x_ter: 1000 * ((x_ter[1] - math.pi)**2 + x_ter[2]**2 + x_ter[3]**2)
+#L_ter_ = lambda x_ter: 1000 * ((x_ter[1] - math.pi)**2 + x_ter[2]**2 + x_ter[3]**2)
+L_ter_ = lambda x_ter: 10000 * ((x_ter[0] - math.pi)**2 + x_ter[1]**2 + x_ter[2]**2 + x_ter[3]**2)
+
+#ff, F, p = model.get_cart_pendulum_model()
+ff, F, p = model.get_pendubot_model()
+f_ = lambda x, u: x + delta * ff(x, u)
 
 f = cs.Function('f', [X, U], [f_(X,U)], {"post_expand": True})
 L = cs.Function('L', [X, U], [L_(X,U)], {"post_expand": True})
@@ -43,7 +45,7 @@ fu = cs.Function('fu', [X, U], [cs.jacobian(f_(X,U), U)], {"post_expand": True})
 L_terx = cs.Function('L_terx', [X], [cs.jacobian(L_ter_(X), X)], {"post_expand": True})
 L_terxx = cs.Function('L_terxx', [X], [cs.jacobian(cs.jacobian(L_ter_(X), X), X)], {"post_expand": True})
 
-u = np.array([0.1 * np.ones(N)])
+u = np.array([1 * np.ones(N)])
 
 cost = 0
 for i in range(N):
@@ -114,17 +116,10 @@ for i in range(N):
 plt.figure()
 plt.plot(update_magnitude)
 plt.savefig('magn.png')
+plt.close()
 
-def animate(i):
-  plt.clf()
-  plt.axis((-5*l, 5*l, -1.5*l, 1.5*l))
-  plt.gca().set_aspect('equal')
-    
-  plt.plot(x[0,:][i] + np.array((l, l, - l, - l, + l))/4,  np.array((l, -l, -l, l, l))/4)
-  plt.gca().add_patch(plt.Circle((x[0,:][i] + math.sin(x[1,:][i]), - math.cos(x[1,:][i])), l/8, color='blue'))
-  plt.plot(np.array((x[0,:][i], x[0,:][i] + math.sin(x[1,:][i]))), np.array((0, - math.cos(x[1,:][i]))))
-
-ani = FuncAnimation(plt.gcf(), animate, frames=N+1, repeat=False, interval=0)
-plt.show()
+# display
+#animation.animate_cart_pendulum(N, x, u, p)
+animation.animate_pendubot(N, x, u, p)
 
 
