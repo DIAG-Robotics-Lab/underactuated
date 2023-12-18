@@ -41,65 +41,39 @@ for i in range(N):
 total_time = 0
 
 # optimization problem
-"""opt = cs.Opti('conic')
+opt = cs.Opti('conic')
 opt.solver('proxqp')
 
 X = opt.variable(4,N+1)
 U = opt.variable(1,N)
-
-F0 = [opt.parameter(n,1)] * N
-A = [opt.parameter(n,n)] * N
-B = [opt.parameter(n,m)] * N
 X_guess = opt.parameter(4,N+1)
 U_guess = opt.parameter(1,N)
 
-opt.subject_to( X[:,0] == x[:, 0] )
-#opt.subject_to( X[:,N] == x_ter )
+opt.subject_to( X[:,0] == x_ini )
+opt.subject_to( X[:,N] == x_ter )
 for i in range(N):
-  opt.subject_to( X[:,i+1] == F0[i] + A[i] @ (X[:,i] - X_guess[:,i]) + B[i] @ (U[:,i] - U_guess[:,i]) )
-  #X[:,i+1] = F0[i] + A[i] @ (X[:,i] - X_guess[:,i]) + B[i] @ (U[:,i] - U_guess[:,i])
+  opt.subject_to( X[:,i+1] == f(X_guess[:,i], U_guess[:,i]) + \
+                  fx(X_guess[:,i], U_guess[:,i]) @ (X[:,i] - X_guess[:,i]) + \
+                  fu(X_guess[:,i], U_guess[:,i]) @ (U[:,i] - U_guess[:,i]) )
+  #X[:,i+1] = f(X_guess[:,i], U_guess[:,i]) + \
+  #           fx(X_guess[:,i], U_guess[:,i]) @ (X[:,i] - X_guess[:,i]) + \
+  #           fu(X_guess[:,i], U_guess[:,i]) @ (U[:,i] - U_guess[:,i])
 
 cost = (x_ter - X[:,N]).T @ Qter @ (x_ter - X[:,N])
 for i in range(N):
   cost = cost + (x_ter - X[:,i]).T @ Q @ (x_ter - X[:,i]) + U[:,i].T @ R @ U[:,i]
 
-opt.minimize(cost)"""
+opt.minimize(cost)
 
 for iter in range(iterations):
   start_time = time.time()
 
-  opt = cs.Opti('conic')
-  opt.solver('proxqp')
-
-  X = opt.variable(4,N+1)
-  U = opt.variable(1,N)
-
-  opt.subject_to( X[:,0] == x[:, 0] )
-  opt.subject_to( X[:,N] == x_ter )
-  for i in range(N):
-    opt.subject_to( X[:,i+1] == f(x[:,i], u[i]) + fx(x[:,i], u[i]) @ (X[:,i] - x[:,i]) + fu(x[:,i], u[i]) @ (U[:,i] - u[i]) )
-    #X[:,i+1] = F0[i] + A[i] @ (X[:,i] - X_guess[:,i]) + B[i] @ (U[:,i] - U_guess[:,i])
-
-  cost = (x_ter - X[:,N]).T @ Qter @ (x_ter - X[:,N])
-  for i in range(N):
-    cost = cost + (x_ter - X[:,i]).T @ Q @ (x_ter - X[:,i]) + U[:,i].T @ R @ U[:,i]
-
-  opt.minimize(cost)
-
-  """opt.set_value(X_guess, x)
+  opt.set_value(X_guess, x)
   opt.set_value(U_guess, u)
-  for i in range(N):
-    opt.set_value(F0[i], f(x[:,i], u[i]))
-    opt.set_value(A[i], fx(x[:,i], u[i]))
-    opt.set_value(B[i], fu(x[:,i], u[i]))"""
 
   sol = opt.solve()
-  #u = sol.value(U)
-  #x = sol.value(X)
-  u += (sol.value(U) - u) * alpha
-  x += (sol.value(X) - x) * alpha
-
-  print(sol.value(cost))
+  u = sol.value(U)
+  x = sol.value(X)
 
   elapsed_time = time.time() - start_time
   total_time += elapsed_time

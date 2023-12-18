@@ -14,12 +14,13 @@ Q = np.eye(n)
 R = np.eye(m)
 Qter = np.eye(n)
 
+x_ini = np.array([0, 0, 0, 0])
+x_ter = np.array([math.pi, 0, 0, 0])
+#x_ter = np.array([0, math.pi, 0, 0])
+
 u = np.zeros(N_sim)
 x = np.zeros((n, N_sim+1))
-x[:, 0] = np.array([0, 0, 0, 0])
-
-#x_ter = np.array([0, math.pi, 0, 0])
-x_ter = np.array([math.pi, 0, 0, 0])
+x[:, 0] = x_ini
 
 opt_sym = cs.Opti()
 X_ = opt_sym.variable(4)
@@ -35,6 +36,29 @@ fu = cs.Function('fu', [X_, U_], [cs.jacobian(f_(X_,U_), U_)], {"post_expand": T
 
 total_time = 0
 
+# optimization problem
+opt = cs.Opti('conic')
+opt.solver('proxqp')
+
+X = opt.variable(4,N+1)
+U = opt.variable(1,N)
+X_guess = opt.parameter(4,N+1)
+U_guess = opt.parameter(1,N)
+x0_param = opt.parameter(4)
+
+opt.subject_to( X[:,0] == x0_param )
+opt.subject_to( X[:,N] == x_ter )
+for i in range(N):
+  opt.subject_to( X[:,i+1] == f(X_guess[:,i], U_guess[i]) + \
+                  fx(X_guess[:,i], U_guess[i]) @ (X[:,i] - X_guess[:,i]) + \
+                  fu(X_guess[:,i], U_guess[i]) @ (U[:,i] - U_guess[i]) )
+
+cost = (x_ter - X[:,N]).T @ Qter @ (x_ter - X[:,N])
+for i in range(N):
+  cost = cost + (x_ter - X[:,i]).T @ Q @ (x_ter - X[:,i]) + U[:,i].T @ R @ U[:,i]
+
+opt.minimize(cost)
+
 u_pred = np.ones(N) * 0.0
 x_pred = np.zeros((n,N+1))
 for i in range(N):
@@ -43,23 +67,9 @@ for i in range(N):
 for j in range(N_sim):
   start_time = time.time()
 
-  # optimization problem
-  opt = cs.Opti('conic')
-  opt.solver('proxqp')
-
-  X = opt.variable(4,N+1)
-  U = opt.variable(1,N)
-
-  opt.subject_to( X[:,0] == x[:,j] )
-  opt.subject_to( X[:,N] == x_ter )
-  for i in range(N):
-    opt.subject_to( X[:,i+1] == f(x_pred[:,i], u_pred[i]) + fx(x_pred[:,i], u_pred[i]) @ (X[:,i] - x_pred[:,i]) + fu(x_pred[:,i], u_pred[i]) @ (U[:,i] - u_pred[i]) )
-
-  cost = (x_ter - X[:,N]).T @ Qter @ (x_ter - X[:,N])
-  for i in range(N):
-    cost = cost + (x_ter - X[:,i]).T @ Q @ (x_ter - X[:,i]) + U[:,i].T @ R @ U[:,i]
-
-  opt.minimize(cost)
+  opt.set_value(X_guess, x_pred)
+  opt.set_value(U_guess, u_pred)
+  opt.set_value(x0_param, x[:,j])
 
   sol = opt.solve()
   u_pred = sol.value(U)
