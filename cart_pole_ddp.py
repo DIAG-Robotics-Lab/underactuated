@@ -11,11 +11,12 @@ n, m = (4, 1)
 N = 100
 Q = np.eye(n)
 R = np.eye(m)
+Q_ter = np.eye(n) * 10000
 Qter = 1000 * np.eye(n)
-iterations = 100
+iterations = 20
 g = 9.81
 
-alpha = 0.9
+alpha_0 = 0.9
 
 x = np.zeros((n, N+1))
 x[:, 0] = np.array([0, 0, 0, 0])
@@ -24,12 +25,14 @@ opt = cs.Opti()
 X = opt.variable(4)
 U = opt.variable(1)
 
-L_ = lambda x, u: x.T @ Q @ x + u.T @ R @ u
+x_ter = np.array((math.pi, 0, 0, 0))
+L_ = lambda x, u: (x_ter - x).T @ Q @ (x_ter - x) + u.T @ R @ u
 #L_ter_ = lambda x_ter: 1000 * ((x_ter[1] - math.pi)**2 + x_ter[2]**2 + x_ter[3]**2)
-L_ter_ = lambda x_ter: 10000 * ((x_ter[0] - math.pi)**2 + x_ter[1]**2 + x_ter[2]**2 + x_ter[3]**2)
+#L_ter_ = lambda x_ter: 10000 * ((x_ter[0] - math.pi)**2 + x_ter[1]**2 + x_ter[2]**2 + x_ter[3]**2)
+L_ter_ = lambda x: (x_ter - x).T @ Q_ter @ (x_ter - x)
 
-#ff, F, p = model.get_cart_pendulum_model()
-ff, F, p = model.get_pendubot_model()
+#ff, p = model.get_cart_pendulum_model()
+ff, p = model.get_pendubot_model()
 f_ = lambda x, u: x + delta * ff(x, u)
 
 f = cs.Function('f', [X, U], [f_(X,U)], {"post_expand": True})
@@ -69,6 +72,8 @@ update_magnitude = np.zeros(iterations)
 for iter in range(iterations):
   start_time = time.time()
 
+  alpha = float(iterations - iter) / float(iterations) * alpha_0
+
   V[N] = L_ter(x[:,N])
   Vx[:, N] = L_terx(x[:,N])
   Vxx[:, :, N] = L_terxx(x[:,N])
@@ -77,7 +82,7 @@ for iter in range(iterations):
     fx_ = fx(x[:,i], u[:,i])
     fu_ = fu(x[:,i], u[:,i])
 
-    Qx = x[:,i].T @ Q + fx_.T @ Vx[:,i+1]
+    Qx = (x_ter - x[:,i]).T @ Q + fx_.T @ Vx[:,i+1]
     Qu = u[:,i].T @ R + fu_.T @ Vx[:,i+1]
 
     Qxx = Q + fx_.T @ Vxx[:,:,i+1] @ fx_

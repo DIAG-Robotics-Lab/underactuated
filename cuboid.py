@@ -27,7 +27,6 @@ f1 = lambda x, u: (u[0]+u[2]) / m
 f2 = lambda x, u: (u[1]+u[3]) / m - g
 f3 = lambda x, u: (x[1] * (u[0]+u[2]) / m + (-w/2-x[0])*u[1] + (w/2-x[0])*u[3]) / I
 f = lambda x, u: cs.vertcat( x[3:6], f1(x, u), f2(x, u), f3(x, u) )
-F = lambda x, u: np.hstack( (x[3:6], f1(x, u), f2(x, u), f3(x, u)) )
 
 U = opt.variable(n_i,N)
 X = opt.variable(n_s,N+1)
@@ -68,7 +67,7 @@ u = sol.value(U)
 
 # integrate
 for i in range(N):
-  x[:,i+1] = x[:,i] + delta * F(x[:,i], u[:,i])
+  x[:,i+1] = x[:,i] + delta * f(x[:,i], u[:,i]).full().squeeze()
 
 # compute ZMP
 x_zmp = np.zeros(N)

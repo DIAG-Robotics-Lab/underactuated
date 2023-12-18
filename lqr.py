@@ -6,7 +6,6 @@ import animation
 import model
 
 opt = cs.Opti()
-opt.solver("ipopt")
 
 # parameters
 N = 200
@@ -19,8 +18,8 @@ x = np.zeros((4,N+1))
 x[0,0] = math.pi + 0.2
 
 # generate model
-#f, F, p = model.get_cart_pendulum_model()
-f, F, p = model.get_pendubot_model()
+#f, p = model.get_cart_pendulum_model()
+f, p = model.get_pendubot_model()
 
 X = opt.variable(4)
 U = opt.variable(1)
@@ -40,7 +39,7 @@ print(P @ A + A.T @ P - P @ B @ np.linalg.inv(R) @ B.T @ P + Q)
 # integrate
 for i in range(N):
   u[i] = - np.linalg.inv(R) @ B.T @ P @ (x[:,i] - [math.pi, 0, 0, 0])
-  x[:,i+1] = x[:,i] + delta * F(x[:,i], u[i])
+  x[:,i+1] = x[:,i] + delta * f(x[:,i], u[i]).full().squeeze()
   
 # display
 #animation.animate_cart_pendulum(N, x, u, p)

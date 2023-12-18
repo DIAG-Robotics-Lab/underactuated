@@ -7,7 +7,7 @@ import time
 
 opt = cs.Opti()
 p_opts = {"ipopt.print_level": 0, "expand": True}
-s_opts = {} #{"max_iter": 1000}
+s_opts = {} #{"max_iter": 1}
 opt.solver("ipopt", p_opts, s_opts)
 
 # parameters
@@ -20,8 +20,8 @@ u = np.zeros(N)
 x = np.zeros((4,N+1))
 
 # generate model
-#f, F, p = model.get_cart_pendulum_model()
-f, F, p = model.get_pendubot_model()
+#f, p = model.get_cart_pendulum_model()
+f, p = model.get_pendubot_model()
 
 # set up optimization problem
 start_time = time.time()
@@ -51,7 +51,7 @@ u = sol.value(U)
 
 # integrate
 for i in range(N):
-  x[:,i+1] = x[:,i] + delta * F(x[:,i], u[i])
+  x[:,i+1] = x[:,i] + delta * f(x[:,i], u[i]).full().squeeze()
 
 elapsed_time = time.time() - start_time
 

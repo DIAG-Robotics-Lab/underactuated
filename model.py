@@ -1,4 +1,3 @@
-import numpy as np
 import casadi as cs
 from collections import namedtuple
 
@@ -10,9 +9,8 @@ def get_cart_pendulum_model():
   f1 = lambda x, u: (p.l*p.m2*cs.sin(x[1])*x[3]**2 + u + p.m2*g*cs.cos(x[1])*cs.sin(x[1])) / (p.m1 + p.m2*(1-cs.cos(x[1])**2)) - p.b1*x[2]
   f2 = lambda x, u: - (p.l*p.m2*cs.cos(x[1])*cs.sin(x[1])*x[3]**2 + u*cs.cos(x[1]) + (p.m1+p.m2)*g*cs.sin(x[1])) / (p.l*p.m1 + p.l*p.m2*(1-cs.cos(x[1])**2)) - p.b2*x[3]
   f = lambda x, u: cs.vertcat( x[2:4], f1(x, u), f2(x, u) )
-  F = lambda x, u: np.hstack( (x[2:4], f1(x, u), f2(x, u)) )
 
-  return (f, F, p)
+  return (f, p)
 
 def get_pendubot_model():
   g = 9.81
@@ -27,6 +25,5 @@ def get_pendubot_model():
   f1 = lambda q, u: (  m22(q, u) * line1(q, u) - m12(q, u) * line2(q, u)) / (m11(q, u)*m22(q, u) - m12(q, u)**2)
   f2 = lambda q, u: (- m12(q, u) * line1(q, u) + m11(q, u) * line2(q, u)) / (m11(q, u)*m22(q, u) - m12(q, u)**2)
   f = lambda x, u: cs.vertcat( x[2:4], f1(x, u), f2(x, u) )
-  F = lambda x, u: np.hstack( (x[2:4], f1(x, u), f2(x, u)) )
 
-  return (f, F, p)
+  return (f, p)
