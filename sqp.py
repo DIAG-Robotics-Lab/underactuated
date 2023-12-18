@@ -29,7 +29,7 @@ L_ = lambda x, u: x.T @ Q @ x + u.T @ R @ u
 L_ter_ = lambda x_ter: 10000 * ((x_ter[0] - math.pi)**2 + x_ter[1]**2 + x_ter[2]**2 + x_ter[3]**2)
 
 #ff, F, p = model.get_cart_pendulum_model()
-ff, F, p = model.get_pendubot_model()
+ff, p = model.get_pendubot_model()
 f_ = lambda x, u: x + delta * ff(x, u)
 
 f = cs.Function('f', [X_, U_], [f_(X_,U_)], {"post_expand": True})
@@ -57,10 +57,6 @@ update_magnitude = np.zeros(iterations)
 # optimization problem
 opt = cs.Opti('conic')
 opt.solver('proxqp')
-#opt = cs.Opti()
-#p_opts = {"ipopt.print_level": 0, "expand": True}
-#s_opts = {} #{"max_iter": 1000}
-#opt.solver("ipopt", p_opts, s_opts)
 
 X = opt.variable(4,N+1)
 U = opt.variable(1,N+1)
@@ -69,7 +65,7 @@ A = [opt.parameter(n,n)] * N
 B = [opt.parameter(n,m)] * N
 
 opt.subject_to( X[:,0] == x[:, 0] )
-opt.subject_to( X[:,N] == [math.pi, 0, 0, 0] )
+#opt.subject_to( X[:,N] == [math.pi, 0, 0, 0] )
 for i in range(N):
   opt.subject_to( X[:,i+1] == A[i] @ X[:,i] + B[i] @ U[:,i] )
 
