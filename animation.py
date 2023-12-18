@@ -10,6 +10,9 @@ def animate_cart_pendulum(N, x, u, p):
   ax_small1 = plt.subplot(grid[0, 1])
   ax_small2 = plt.subplot(grid[1, 1])
 
+  x_max = max(x.min(), x.max(), key=abs)
+  u_max = max(u.min(), u.max(), key=abs)
+
   def animate(i):
     ax_large.cla()
     ax_large.axis((-4, 4, -1.5, 1.5))
@@ -20,11 +23,11 @@ def animate_cart_pendulum(N, x, u, p):
     ax_large.plot(np.array((x[0,:][i], x[0,:][i] + math.sin(x[1,:][i]))), np.array((0, - math.cos(x[1,:][i]))))
 
     ax_small1.cla()
-    ax_small1.axis((0, N, -10, 10))
+    ax_small1.axis((0, N, -x_max*1.1, x_max*1.1))
     ax_small1.plot(x[:,:i].T)
 
     ax_small2.cla()
-    ax_small2.axis((0, N, -50, 50))
+    ax_small2.axis((0, N, -u_max*1.1, u_max*1.1))
     ax_small2.plot(u[:i])
 
   ani = FuncAnimation(plt.gcf(), animate, frames=N+1, repeat=True, interval=10)

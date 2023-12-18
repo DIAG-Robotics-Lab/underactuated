@@ -11,103 +11,107 @@ n, m = (4, 1)
 N = 100
 Q = np.eye(n)
 R = np.eye(m)
-Qter = 1000 * np.eye(n)
+Qter = np.eye(n)
 iterations = 100
-g = 9.81
+alpha_0 = 1
+alpha = alpha_0
 
-alpha = 0.9
+x_ini = np.array([0, 0, 0, 0])
+x_ter = np.array([math.pi, 0, 0, 0])
 
 x = np.zeros((n, N+1))
-x[:, 0] = np.array([0, 0, 0, 0])
+x[:, 0] = x_ini
 
-opt = cs.Opti()
-X_ = opt.variable(4)
-U_ = opt.variable(1)
+opt_sym = cs.Opti()
+X_ = opt_sym.variable(4)
+U_ = opt_sym.variable(1)
 
-L_ = lambda x, u: x.T @ Q @ x + u.T @ R @ u
-#L_ter_ = lambda x_ter: 1000 * ((x_ter[1] - math.pi)**2 + x_ter[2]**2 + x_ter[3]**2)
-L_ter_ = lambda x_ter: 10000 * ((x_ter[0] - math.pi)**2 + x_ter[1]**2 + x_ter[2]**2 + x_ter[3]**2)
-
-#ff, F, p = model.get_cart_pendulum_model()
+#ff, p = model.get_cart_pendulum_model()
 ff, p = model.get_pendubot_model()
 f_ = lambda x, u: x + delta * ff(x, u)
 
 f = cs.Function('f', [X_, U_], [f_(X_,U_)], {"post_expand": True})
-L = cs.Function('L', [X_, U_], [L_(X_,U_)], {"post_expand": True})
-L_ter = cs.Function('L_ter', [X_], [L_ter_(X_)], {"post_expand": True})
 fx = cs.Function('fx', [X_, U_], [cs.jacobian(f_(X_,U_), X_)], {"post_expand": True})
 fu = cs.Function('fu', [X_, U_], [cs.jacobian(f_(X_,U_), U_)], {"post_expand": True})
-L_terx = cs.Function('L_terx', [X_], [cs.jacobian(L_ter_(X_), X_)], {"post_expand": True})
-L_terxx = cs.Function('L_terxx', [X_], [cs.jacobian(cs.jacobian(L_ter_(X_), X_), X_)], {"post_expand": True})
 
-u = np.ones(N) * 10
-
-cost = 0
+u = np.ones(N) * 1
 for i in range(N):
   x[:, i+1] = np.array(f(x[:,i], u[i])).flatten()
-  cost = cost + L(x[:,i], u[i])
-
-cost = cost + L_ter(x[:, N])
-
-xnew = np.zeros((n, N+1))
 
 total_time = 0
-update_magnitude = np.zeros(iterations)
 
 # optimization problem
-opt = cs.Opti('conic')
+"""opt = cs.Opti('conic')
 opt.solver('proxqp')
 
 X = opt.variable(4,N+1)
-U = opt.variable(1,N+1)
+U = opt.variable(1,N)
 
+F0 = [opt.parameter(n,1)] * N
 A = [opt.parameter(n,n)] * N
 B = [opt.parameter(n,m)] * N
+X_guess = opt.parameter(4,N+1)
+U_guess = opt.parameter(1,N)
 
 opt.subject_to( X[:,0] == x[:, 0] )
-#opt.subject_to( X[:,N] == [math.pi, 0, 0, 0] )
+#opt.subject_to( X[:,N] == x_ter )
 for i in range(N):
-  opt.subject_to( X[:,i+1] == A[i] @ X[:,i] + B[i] @ U[:,i] )
+  opt.subject_to( X[:,i+1] == F0[i] + A[i] @ (X[:,i] - X_guess[:,i]) + B[i] @ (U[:,i] - U_guess[:,i]) )
+  #X[:,i+1] = F0[i] + A[i] @ (X[:,i] - X_guess[:,i]) + B[i] @ (U[:,i] - U_guess[:,i])
 
-cost = 0
+cost = (x_ter - X[:,N]).T @ Qter @ (x_ter - X[:,N])
 for i in range(N):
-  cost = cost + L(X[:,i], U[:,i])
-cost = cost + L_ter(X[:, N])
+  cost = cost + (x_ter - X[:,i]).T @ Q @ (x_ter - X[:,i]) + U[:,i].T @ R @ U[:,i]
 
-opt.minimize(cost)
+opt.minimize(cost)"""
 
 for iter in range(iterations):
   start_time = time.time()
 
+  opt = cs.Opti('conic')
+  opt.solver('proxqp')
+
+  X = opt.variable(4,N+1)
+  U = opt.variable(1,N)
+
+  opt.subject_to( X[:,0] == x[:, 0] )
+  opt.subject_to( X[:,N] == x_ter )
   for i in range(N):
+    opt.subject_to( X[:,i+1] == f(x[:,i], u[i]) + fx(x[:,i], u[i]) @ (X[:,i] - x[:,i]) + fu(x[:,i], u[i]) @ (U[:,i] - u[i]) )
+    #X[:,i+1] = F0[i] + A[i] @ (X[:,i] - X_guess[:,i]) + B[i] @ (U[:,i] - U_guess[:,i])
+
+  cost = (x_ter - X[:,N]).T @ Qter @ (x_ter - X[:,N])
+  for i in range(N):
+    cost = cost + (x_ter - X[:,i]).T @ Q @ (x_ter - X[:,i]) + U[:,i].T @ R @ U[:,i]
+
+  opt.minimize(cost)
+
+  """opt.set_value(X_guess, x)
+  opt.set_value(U_guess, u)
+  for i in range(N):
+    opt.set_value(F0[i], f(x[:,i], u[i]))
     opt.set_value(A[i], fx(x[:,i], u[i]))
-    opt.set_value(B[i], fu(x[:,i], u[i]))
+    opt.set_value(B[i], fu(x[:,i], u[i]))"""
 
   sol = opt.solve()
-  u = sol.value(U)
-  xnew = sol.value(X)
+  #u = sol.value(U)
+  #x = sol.value(X)
+  u += (sol.value(U) - u) * alpha
+  x += (sol.value(X) - x) * alpha
 
-  update_magnitude[iter] = np.linalg.norm(x-xnew)
-  x = xnew
+  print(sol.value(cost))
 
   elapsed_time = time.time() - start_time
   total_time += elapsed_time
   print('Iteration time: ', elapsed_time*1000, ' ms')
 
-print('Total time: ', total_time*1000, ' ms')
-
 xcheck = np.zeros((n, N+1))
-xcheck[:,0] = np.array([0, 0, 0, 0])
+xcheck[:,0] = x_ini
 for i in range(N):
   xcheck[:, i+1] = np.array(f(xcheck[:,i], u[i])).flatten()
 
-plt.figure()
-plt.plot(update_magnitude)
-plt.savefig('magn.png')
-plt.close()
-
 # display
 #animation.animate_cart_pendulum(N, x, u, p)
-animation.animate_pendubot(N, x, u, p)
+animation.animate_pendubot(N, xcheck, u, p)
 
 

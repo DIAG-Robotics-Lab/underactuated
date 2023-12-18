@@ -125,6 +125,6 @@ plt.close()
 
 # display
 #animation.animate_cart_pendulum(N, x, u, p)
-animation.animate_pendubot(N, x, u, p)
+animation.animate_pendubot(N, xcheck, u.flatten(), p)
 
 
