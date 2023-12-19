@@ -1,7 +1,5 @@
 import numpy as np
-import sympy as sp
 import matplotlib.pyplot as plt
-from casadi import *
 
 delta = 0.1
 N = 100
@@ -9,41 +7,31 @@ Q = np.eye(3)
 R = np.eye(2)
 Qter = 100 * np.eye(3)
 iterations = 100
-n, m = (3, 2)
+n = 3
+m = 2
 alpha = 0.9
 
 x = np.zeros((n, N+1))
 x[:, 0] = np.array([0, 1, 0])
 
-# dynamics and derivatives
-x0, x1, x2, u0, u1 = sp.symbols('x0 x1 x2 u0 u1')
-X = sp.Matrix([[x0], [x1], [x2]])
-U = sp.Matrix([[u0], [u1]])
+f = lambda x, u: x + delta * np.array([u[0] * np.cos(x[2]), u[0] * np.sin(x[2]), u[1]])
+fx = lambda x, u: np.eye(n) + delta * np.array([[0, 0, -u[0] * np.sin(x[2])], [0, 0, u[0] * np.cos(x[2])], [0, 0, 0]])
+fu = lambda x, u: delta * np.array([[np.cos(x[2]), 0], [np.sin(x[2]), 0], [0, 1]])
+L = lambda x, u: x.T @ Q @ x + u.T @ R @ u
+Lx = lambda x, u: 2 * Q @ x
+Lu = lambda x, u: 2 * R @ u
+Lxx = lambda x, u: 2 * Q
+Lux = lambda x, u: np.zeros((m, n))
+Luu = lambda x, u: 2 * R
+L_ter = lambda x_ter: x_ter.T @ Qter @ x_ter
+L_terx = lambda x_ter: 2 * Qter @ x_ter
+L_terxx = lambda x_ter: 2 * Qter
 
-f_sym = sp.Matrix([[X[0] + delta * U[0] * sp.cos(X[2])], [X[1] + delta * U[0] * sp.sin(X[2])], [X[2] + delta * U[1]]])
-f = sp.lambdify([X, U], f_sym, 'numpy')
-fx = sp.lambdify([X, U], f_sym.jacobian(X), 'numpy')
-fu = sp.lambdify([X, U], f_sym.jacobian(U), 'numpy')
-
-L_sym = X.T * Q * X + U.T * R * U
-L = sp.lambdify([X, U], L_sym, 'numpy')
-Lx = sp.lambdify([X, U], L_sym.jacobian(X), 'numpy')
-Lu = sp.lambdify([X, U], L_sym.jacobian(U), 'numpy')
-Lxx = sp.lambdify([X, U], L_sym.jacobian(X).jacobian(X), 'numpy')
-Lux = sp.lambdify([X, U], L_sym.jacobian(U).jacobian(X), 'numpy')
-Luu = sp.lambdify([X, U], L_sym.jacobian(U).jacobian(U), 'numpy')
-
-L_ter_sym = X.T * Qter * X
-L_ter = sp.lambdify([X], L_ter_sym, 'numpy')
-L_terx = sp.lambdify([X], L_ter_sym.jacobian(X), 'numpy')
-L_terxx = sp.lambdify([X], L_ter_sym.jacobian(X).jacobian(X), 'numpy')
-
-# integrate initial guess
 u = np.array([0.15 * np.ones(N), -0.3 * np.ones(N)])
 
 cost = 0
 for i in range(N):
-  x[:, i+1] = f(x[:, i], u[:, i]).flatten()
+  x[:, i+1] = f(x[:, i], u[:, i])
   cost = cost + L(x[:, i], u[:, i])
 
 cost = cost + L_ter(x[:, N])
@@ -63,7 +51,7 @@ for iter in range(iterations):
 
   for i in reversed(range(N)):
     Qx = Lx(x[:, i], u[:, i]) + fx(x[:, i], u[:, i]).T @ Vx[:, i + 1]
-    Qu = (Lu(x[:, i], u[:, i]) + fu(x[:, i], u[:, i]).T @ Vx[:, i + 1]).flatten()
+    Qu = Lu(x[:, i], u[:, i]) + fu(x[:, i], u[:, i]).T @ Vx[:, i + 1]
 
     Qxx = Lxx(x[:, i], u[:, i]) + fx(x[:, i], u[:, i]).T @ Vxx[:, :, i + 1] @ fx(x[:, i], u[:, i])
     Qux = Lux(x[:, i], u[:, i]) + fu(x[:, i], u[:, i]).T @ Vxx[:, :, i + 1] @ fx(x[:, i], u[:, i])
@@ -82,7 +70,7 @@ for iter in range(iterations):
 
   for i in range(N):
     unew[:, i] = u[:, i] + alpha * k[i] + K[i] @ (xnew[:, i] - x[:, i])
-    xnew[:, i+1] = f(xnew[:, i], unew[:, i]).flatten()
+    xnew[:, i+1] = f(xnew[:, i], unew[:, i])
 
   u = unew
   x = xnew
@@ -92,7 +80,7 @@ for iter in range(iterations):
 xcheck = np.zeros((n, N+1))
 xcheck[:, 0] = np.array([0, 1, 0])
 for i in range(N):
-  xcheck[:, i+1] = f(xcheck[:, i], u[:, i]).flatten()
+  xcheck[:, i+1] = f(xcheck[:, i], u[:, i])
 
 plt.plot(xcheck[0, :], xcheck[1, :], 'k')
 plt.axis('equal')
