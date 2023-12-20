@@ -8,7 +8,7 @@ import time
 
 # parameters
 N = 100
-N_sim = 500
+N_sim = 200
 delta_mpc = 0.01
 delta_sim = 0.01
 g = 9.81
@@ -40,11 +40,11 @@ for i in range(N):
 opt.subject_to( X[:,0] == x0_param )
 x_term = np.array([[math.pi], [0], [0], [0]])
 #opt.subject_to( X[(1,2,3),N] == (math.pi, 0, 0) )
-#opt.subject_to( X[(0,1,2,3),N] == (math.pi, 0, 0, 0) )
+#opt.subject_to( X[(0,1,2,3),N] == x_term )
 
 # input constraint
-opt.subject_to( U <=   np.ones((1,N)) * u_max )
-opt.subject_to( U >= - np.ones((1,N)) * u_max )
+#opt.subject_to( U <=   np.ones((1,N)) * u_max )
+#opt.subject_to( U >= - np.ones((1,N)) * u_max )
 
 # cost function
 X_lqr = opt.variable(4)
@@ -72,6 +72,8 @@ cost = wu*cs.sumsqr(U) + \
 
 opt.minimize(cost)
 
+x_pred_record = []
+
 # iterate
 elapsed_time = np.zeros(N_sim)
 for j in range(N_sim):
@@ -80,6 +82,7 @@ for j in range(N_sim):
   opt.set_value(x0_param, x[:,j])
   sol = opt.solve()
   u[j] = sol.value(U[:,0])
+  x_pred_record.append(sol.value(X))
   
   # integrate
   x[:,j+1] = x[:,j] + delta_sim * f(x[:,j], u[j]).full().squeeze()
@@ -91,4 +94,4 @@ print('Average computation time: ', np.mean(elapsed_time)*1000, ' ms')
 
 # display
 #animation.animate_cart_pendulum(N_sim, x, u, p)
-animation.animate_pendubot(N_sim, x, u, p)
+animation.animate_pendubot(N_sim, x, u, p, x_pred_record)
