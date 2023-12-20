@@ -69,12 +69,6 @@ x_pred_record = []
 for j in range(N_sim):
   start_time = time.time()
 
-  # set guess to shifted previous solution
-  x_pred[:,0:N] = x_pred[:,1:N+1]
-  x_pred[:,N] = x_pred[:,N-1]
-  u_pred[0:N-1] = u_pred[1:N]
-  u_pred[N-1] = u_pred[N-2]
-
   opt.set_value(X_guess, x_pred)
   opt.set_value(U_guess, u_pred)
   opt.set_value(x0_param, x[:,j])
@@ -84,6 +78,10 @@ for j in range(N_sim):
   u_pred = sol.value(U)
   x_pred = sol.value(X)
   x_pred_record.append(x_pred)
+
+  # set initial guess for next iteration
+  #opt.set_initial(U, u_pred)
+  #opt.set_initial(X, x_pred)
 
   u[j] = u_pred[0]
   x[:,j+1] = np.array(f(x[:,j], u[j])).flatten()

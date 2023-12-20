@@ -82,7 +82,13 @@ for j in range(N_sim):
   opt.set_value(x0_param, x[:,j])
   sol = opt.solve()
   u[j] = sol.value(U[:,0])
-  x_pred_record.append(sol.value(X))
+  u_pred = sol.value(U)
+  x_pred = sol.value(X)
+  x_pred_record.append(x_pred)
+
+  # set initial guess for next iteration
+  #opt.set_initial(U, u_pred)
+  #opt.set_initial(X, x_pred)
   
   # integrate
   x[:,j+1] = x[:,j] + delta_sim * f(x[:,j], u[j]).full().squeeze()
