@@ -67,8 +67,8 @@ for j in range(N_sim):
   x_pred_record.append(x_pred)
 
   # set initial guess for next iteration
-  #opt.set_initial(U, u_pred)
-  #opt.set_initial(X, x_pred)
+  opt.set_initial(U, u_pred)
+  opt.set_initial(X, x_pred)
   
   # integrate
   x[:,j+1] = x[:,j] + delta_sim * f(x[:,j], u[j]).full().squeeze()
