@@ -1,5 +1,4 @@
 import numpy as np
-import math
 import matplotlib.pyplot as plt
 import casadi as cs
 import time
@@ -13,14 +12,12 @@ Q = np.eye(n)
 R = np.eye(m)
 Qter = np.eye(n)
 iterations = 100
-alpha_0 = 1
-alpha = alpha_0
 
-x_ini = np.array([0, 0, 0, 0])
-x_ter = np.array([math.pi, 0, 0, 0])
+x_init = np.array([0, 0, 0, 0])
+x_goal = np.array([cs.pi, 0, 0, 0])
 
 x = np.zeros((n, N+1))
-x[:, 0] = x_ini
+x[:, 0] = x_init
 
 opt_sym = cs.Opti()
 X_ = opt_sym.variable(4)
@@ -30,7 +27,7 @@ U_ = opt_sym.variable(1)
 ff, p = model.get_pendubot_model()
 f_ = lambda x, u: x + delta * ff(x, u)
 
-f = cs.Function('f', [X_, U_], [f_(X_,U_)], {"post_expand": True})
+f  = cs.Function('f' , [X_, U_], [f_(X_,U_)]                 , {"post_expand": True})
 fx = cs.Function('fx', [X_, U_], [cs.jacobian(f_(X_,U_), X_)], {"post_expand": True})
 fu = cs.Function('fu', [X_, U_], [cs.jacobian(f_(X_,U_), U_)], {"post_expand": True})
 
@@ -44,48 +41,46 @@ total_time = 0
 opt = cs.Opti('conic')
 opt.solver('proxqp')
 
-X = opt.variable(4,N+1)
-U = opt.variable(1,N)
-X_guess = opt.parameter(4,N+1)
-U_guess = opt.parameter(1,N)
+dX = opt.variable(4,N+1)
+dU = opt.variable(1,N)
+X = opt.parameter(4,N+1)
+U = opt.parameter(1,N)
 
-opt.subject_to( X[:,0] == x_ini )
-opt.subject_to( X[:,N] == x_ter )
+opt.subject_to( dX[:,0] == (0,0,0,0) )
+opt.subject_to( X[:,N] + dX[:,N] == x_goal )
 for i in range(N):
-  opt.subject_to( X[:,i+1] == f(X_guess[:,i], U_guess[:,i]) + \
-                  fx(X_guess[:,i], U_guess[:,i]) @ (X[:,i] - X_guess[:,i]) + \
-                  fu(X_guess[:,i], U_guess[:,i]) @ (U[:,i] - U_guess[:,i]) )
-  #X[:,i+1] = f(X_guess[:,i], U_guess[:,i]) + \
-  #           fx(X_guess[:,i], U_guess[:,i]) @ (X[:,i] - X_guess[:,i]) + \
-  #           fu(X_guess[:,i], U_guess[:,i]) @ (U[:,i] - U_guess[:,i])
+  opt.subject_to( X[:,i+1] + dX[:,i+1] == f(X[:,i], U[:,i]) + \
+                  fx(X[:,i], U[:,i]) @ dX[:,i] + \
+                  fu(X[:,i], U[:,i]) @ dU[:,i] )
 
-cost = (x_ter - X[:,N]).T @ Qter @ (x_ter - X[:,N])
+cost = (X[:,N] + dX[:,N] - x_goal).T @ Qter @ (X[:,N] + dX[:,N] - x_goal)
 for i in range(N):
-  cost = cost + (x_ter - X[:,i]).T @ Q @ (x_ter - X[:,i]) + U[:,i].T @ R @ U[:,i]
+  cost = cost + \
+         (X[:,i] + dX[:,i] - x_goal).T @ Q @ (X[:,i] + dX[:,i] - x_goal) + \
+         (U[:,i] + dU[:,i]).T @ R @ (U[:,i] + dU[:,i])
 
 opt.minimize(cost)
 
 for iter in range(iterations):
   start_time = time.time()
 
-  opt.set_value(X_guess, x)
-  opt.set_value(U_guess, u)
+  opt.set_value(X, x)
+  opt.set_value(U, u)
 
   sol = opt.solve()
-  u = sol.value(U)
-  x = sol.value(X)
+  u = sol.value(U) + sol.value(dU)
+  x = sol.value(X) + sol.value(dX)
 
   elapsed_time = time.time() - start_time
   total_time += elapsed_time
   print('Iteration time: ', elapsed_time*1000, ' ms')
 
 xcheck = np.zeros((n, N+1))
-xcheck[:,0] = x_ini
+xcheck[:,0] = x_init
 for i in range(N):
   xcheck[:, i+1] = np.array(f(xcheck[:,i], u[i])).flatten()
 
 # display
-#animation.animate_cart_pendulum(N, x, u, p)
 animation.animate_pendubot(N, xcheck, u, p)
 
 
