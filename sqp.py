@@ -3,47 +3,43 @@ import matplotlib.pyplot as plt
 import casadi as cs
 import time
 import model
-import animation
 
-# parameters
-delta = 0.01
-n, m = (4, 1)
+# initialization
+opt = cs.Opti('conic')
+opt.solver('proxqp')
+mod = model.Pendubot()
 N = 100
-Q = np.eye(n)
-R = np.eye(m)
-Qter = np.eye(n)
-iterations = 10
-total_time = 0
-x_init = np.array([0, 0, 0, 0])
-x_goal = np.array([cs.pi, 0, 0, 0])
+delta = 0.01
+Q = np.eye(mod.n)
+R = np.eye(mod.m)
+Qter = np.eye(mod.n)
+max_iters = 20
+x_init = np.zeros(mod.n)
+
+if   mod.name == 'cart_pendulum': x_goal = np.array((0, cs.pi, 0, 0))
+elif mod.name == 'pendubot'     : x_goal = np.array((cs.pi, 0, 0, 0))
+elif mod.name == 'uav'          : x_goal = np.array((1, 1, 0, 0, 0, 0))
 
 # initial guess
-x = np.zeros((n,N+1))
-u = np.zeros((m,N))
+x = np.zeros((mod.n,N+1))
+u = np.zeros((mod.m,N))
 x[:, 0] = x_init
 
 # dynamics and its derivatives
-#ff, p = model.get_cart_pendulum_model()
-ff, p = model.get_pendubot_model()
-f_ = lambda x, u: x + delta * ff(x, u)
-
-opt_sym = cs.Opti()
-X_ = opt_sym.variable(n)
-U_ = opt_sym.variable(m)
-f  = cs.Function('f' , [X_, U_], [f_(X_,U_)]                 , {"post_expand": True})
-fx = cs.Function('fx', [X_, U_], [cs.jacobian(f_(X_,U_), X_)], {"post_expand": True})
-fu = cs.Function('fu', [X_, U_], [cs.jacobian(f_(X_,U_), U_)], {"post_expand": True})
+f_ = lambda x, u: x + delta * mod.f(x, u)
+X_ = opt.variable(mod.n)
+U_ = opt.variable(mod.m)
+f  = cs.Function('f' , [X_,U_], [f_(X_,U_)]                , {"post_expand": True})
+fx = cs.Function('fx', [X_,U_], [cs.jacobian(f_(X_,U_),X_)], {"post_expand": True})
+fu = cs.Function('fu', [X_,U_], [cs.jacobian(f_(X_,U_),U_)], {"post_expand": True})
 
 # optimization problem
-opt = cs.Opti('conic')
-opt.solver('proxqp')
+dX = opt.variable(mod.n,N+1)
+dU = opt.variable(mod.m,N)
+X = opt.parameter(mod.n,N+1)
+U = opt.parameter(mod.m,N)
 
-dX = opt.variable(n,N+1)
-dU = opt.variable(m,N)
-X = opt.parameter(n,N+1)
-U = opt.parameter(m,N)
-
-opt.subject_to( dX[:,0] == np.zeros(n) )
+opt.subject_to( dX[:,0] == np.zeros(mod.n) )
 opt.subject_to( X[:,N] + dX[:,N] == x_goal )
 for i in range(N):
   opt.subject_to( X[:,i+1] + dX[:,i+1] == f(X[:,i], U[:,i]) + \
@@ -59,26 +55,23 @@ for i in range(N):
 opt.minimize(cost)
 
 # SQP iterations
-for iter in range(iterations):
+for iter in range(max_iters):
   start_time = time.time()
 
   opt.set_value(X, x)
   opt.set_value(U, u)
 
   sol = opt.solve()
-  u = sol.value(U) + sol.value(dU)
-  x = sol.value(X) + sol.value(dX)
+  x = np.asmatrix(sol.value(X) + sol.value(dX))
+  u = np.asmatrix(sol.value(U) + sol.value(dU))
 
   elapsed_time = time.time() - start_time
-  total_time += elapsed_time
-  print('Iteration time: ', elapsed_time*1000, ' ms')
+  print('Iteration time: ', elapsed_time * 1000, ' ms')
 
-xcheck = np.zeros((n,N+1))
+xcheck = np.zeros((mod.n,N+1))
 xcheck[:,0] = x_init
 for i in range(N):
-  xcheck[:, i+1] = np.array(f(xcheck[:,i], u[i])).flatten()
+  xcheck[:, i+1] = np.array(f(xcheck[:,i], u[:,i])).flatten()
 
 # display
-animation.animate_pendubot(N, xcheck, u, p)
-
-
+mod.animate(N, xcheck, u)

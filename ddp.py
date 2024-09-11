@@ -3,18 +3,21 @@ import matplotlib.pyplot as plt
 import casadi as cs
 import time
 import model
-import animation
 
-# parameters
+# initialization
+mod = model.Pendubot()
 Δ = 0.01
-n, m = 4, 1
+n, m = mod.n, mod.m
 N = 100
 max_ddp_iters = 10
 max_line_search_iters = 10
 Q = np.eye(n) * 0
 R = np.eye(m) * 0.01
 Q_ter = np.eye(n) * 10000
-x_ter = np.array((cs.pi, 0, 0, 0))
+
+if   mod.name == 'cart_pendulum': x_ter = np.array((0, cs.pi, 0, 0))
+elif mod.name == 'pendubot'     : x_ter = np.array((cs.pi, 0, 0, 0))
+elif mod.name == 'uav'          : x_ter = np.array((1, 1, 0, 0, 0, 0))
 
 # symbolic variables
 opt = cs.Opti()
@@ -35,7 +38,7 @@ L_terx  = cs.Function('L_terx' , [X]   , [cs.jacobian(L_ter(X), X)] , {"post_exp
 L_terxx = cs.Function('L_terxx', [X]   , [cs.jacobian(L_terx(X), X)], {"post_expand": True})
 
 # dynamics
-f_cont, p = model.get_pendubot_model()
+f_cont = mod.f
 f_ = lambda x, u: x + Δ * f_cont(x, u)
 f = cs.Function('f', [X, U], [f_(X,U)], {"post_expand": True})
 fx = cs.Function('fx', [X, U], [cs.jacobian(f_(X,U), X)], {"post_expand": True})
@@ -44,7 +47,7 @@ fu = cs.Function('fu', [X, U], [cs.jacobian(f_(X,U), U)], {"post_expand": True})
 # initial forward pass
 x = np.zeros((n, N+1))
 u = np.ones((m, N))
-x[:, 0] = np.array([0, 0, 0, 0])
+x[:, 0] = np.zeros(n)
 
 cost = 0
 for i in range(N):
@@ -100,7 +103,7 @@ for iter in range(max_ddp_iters):
   for ls_iter in range(max_line_search_iters):
     new_cost = 0
     for i in range(N):
-      unew[:,i] = u[:,i] + alpha * k[i] + K[i] @ (xnew[:,i] - x[:,i])
+      unew[:,i] = np.array(u[:,i] + alpha * k[i] + K[i] @ (xnew[:,i] - x[:,i])).flatten()
       xnew[:,i+1] = np.array(f(xnew[:,i], unew[:,i])).flatten()
       new_cost = new_cost + L(xnew[:,i], unew[:,i])
     new_cost = new_cost + L_ter(xnew[:,N])
@@ -121,11 +124,9 @@ print('Total time: ', total_time*1000, ' ms')
 
 # check result
 xcheck = np.zeros((n, N+1))
-xcheck[:,0] = np.array([0, 0, 0, 0])
+xcheck[:,0] = np.zeros(n)
 for i in range(N):
   xcheck[:, i+1] = np.array(f(xcheck[:,i], u[:,i])).flatten()
 
 # display
-animation.animate_pendubot(N, xcheck, u.flatten(), p)
-
-
+mod.animate(N, xcheck, u)

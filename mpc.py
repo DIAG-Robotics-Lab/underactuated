@@ -1,53 +1,44 @@
 import numpy as np
-import math
 import casadi as cs
-import animation
 import model
 import time
 
-# parameters
+# initialization
+opt = cs.Opti()
+p_opts, s_opts = {"ipopt.print_level": 0, "expand": True}, {}
+opt.solver("ipopt", p_opts, s_opts)
+mod = model.Pendubot()
 N = 100
 N_sim = 200
 delta_mpc = 0.01
 delta_sim = 0.01
-g = 9.81
 u_max = 5000
+f = mod.f
 
 # trajectory
-u = np.zeros(N_sim)
-x = np.zeros((4,N_sim+1))
-
-# generate model
-#f, p = model.get_cart_pendulum_model()
-f, p = model.get_pendubot_model()
+x = np.zeros((mod.n,N_sim+1))
+u = np.zeros((mod.m,N_sim))
 
 # optimization problem setup
-opt = cs.Opti()
-p_opts = {"ipopt.print_level": 0, "expand": True}
-s_opts = {} #{"max_iter": 1}
-opt.solver("ipopt", p_opts, s_opts)
+X = opt.variable(mod.n,N+1)
+U = opt.variable(mod.m,N)
+x0_param = opt.parameter(mod.n)
 
-X = opt.variable(4,N+1)
-U = opt.variable(1,N)
-x0_param = opt.parameter(4)
-
-# dynamics constraint
 for i in range(N):
-  opt.subject_to( X[:,i+1] == X[:,i] + delta_mpc * f(X[:,i], U[0,i]) )
+  opt.subject_to( X[:,i+1] == X[:,i] + delta_mpc * f(X[:,i], U[:,i]) )
 
-# initial and terminal state
-x_ter = np.array((math.pi, 0, 0, 0))
+x_ter = np.array((cs.pi, 0, 0, 0))
 opt.subject_to( X[:,0] == x0_param )
-#opt.subject_to( X[(1,2,3),N] == (math.pi, 0, 0) )
-opt.subject_to( X[(0,1,2,3),N] == x_ter )
+if   mod.name == 'cart_pendulum': opt.subject_to( X[(1,2,3),N] == (cs.pi, 0, 0) )
+elif mod.name == 'pendubot'     : opt.subject_to( X[:,N]       == (cs.pi, 0, 0, 0) )
+elif mod.name == 'uav'          : opt.subject_to( X[:,N]       == (1, 1, 0, 0, 0, 0) )
 
 # input constraint
-#opt.subject_to( U <=   np.ones((1,N)) * u_max )
-#opt.subject_to( U >= - np.ones((1,N)) * u_max )
+#opt.subject_to( U <=   np.ones((mod.m,N)) * u_max )
+#opt.subject_to( U >= - np.ones((mod.m,N)) * u_max )
 
 # cost function
-wu, wx0, wx1, wx2, wx3 = (1, 1, 1, 1, 1)
-cost = wu*cs.sumsqr(U) + wx0*cs.sumsqr(X[0,:]-x_ter[0]) + wx1*cs.sumsqr(X[1,:]-x_ter[1]) + wx2*cs.sumsqr(X[2,:]-x_ter[2]) + wx3*cs.sumsqr(X[3,:]-x_ter[3])
+cost = cs.sumsqr(U)
 opt.minimize(cost)
 
 x_pred_record = []
@@ -60,7 +51,7 @@ for j in range(N_sim):
   # solve NLP
   opt.set_value(x0_param, x[:,j])
   sol = opt.solve()
-  u[j] = sol.value(U[:,0])
+  u[:,j] = sol.value(U[:,0])
 
   u_pred = sol.value(U)
   x_pred = sol.value(X)
@@ -71,13 +62,11 @@ for j in range(N_sim):
   opt.set_initial(X, x_pred)
   
   # integrate
-  x[:,j+1] = x[:,j] + delta_sim * f(x[:,j], u[j]).full().squeeze()
+  x[:,j+1] = x[:,j] + delta_sim * f(x[:,j], u[:,j]).full().squeeze()
 
   elapsed_time[j] = time.time() - start_time
 
-print('Total cost: ', cs.sumsqr(u))
-print('Average computation time: ', np.mean(elapsed_time)*1000, ' ms')
+print('Average computation time: ', np.mean(elapsed_time) * 1000, ' ms')
 
 # display
-#animation.animate_cart_pendulum(N_sim, x, u, p)
-animation.animate_pendubot(N_sim, x, u, p, x_pred_record)
+ani = mod.animate(N_sim, x, u)

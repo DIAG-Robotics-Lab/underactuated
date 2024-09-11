@@ -1,63 +1,47 @@
 import numpy as np
-import math
 import casadi as cs
-import animation
 import model
 import time
 
+# initialization
 opt = cs.Opti()
-p_opts = {"ipopt.print_level": 0, "expand": True}
-s_opts = {} #{"max_iter": 1}
+p_opts, s_opts = {"ipopt.print_level": 0, "expand": True}, {}
 opt.solver("ipopt", p_opts, s_opts)
-
-# parameters
+mod = model.Pendubot()
 N = 200
 delta = 0.01
-g = 9.81
+f = mod.f
 
 # trajectory
-u = np.zeros(N)
-x = np.zeros((4,N+1))
+x = np.zeros((mod.n,N+1))
+u = np.zeros((mod.m,N))
 
-# generate model
-#f, p = model.get_cart_pendulum_model()
-f, p = model.get_pendubot_model()
-
-# set up optimization problem
+# optimization problem
 start_time = time.time()
-X = opt.variable(4,N+1)
-U = opt.variable(1,N+1)
+X = opt.variable(mod.n,N+1)
+U = opt.variable(mod.m,N+1)
 
 for i in range(N):
-  # multiple shooting
-  opt.subject_to( X[:,i+1] == X[:,i] + delta * f(X[:,i], U[0,i]) )
-
-  #single shooting
-  #X[:,i+1] = X[:,i] + delta * f(X[:,i], U[0,i])
-
-  #direct collocation
-  #opt.subject_to( X[:,i+1] == X[:,i] + (delta/6) * (f(X[:,i], U[0,i]) + 4 * f((X[:,i]+X[:,i+1])/2 + (f(X[:,i], U[0,i])+f(X[:,i+1], U[0,i+1]))*delta/8, (U[0,i]+U[0,i+1])/2) + f(X[:,i+1], U[0,i+1])) )
+  opt.subject_to( X[:,i+1] == X[:,i] + delta * f(X[:,i], U[:,i]) )
 
 opt.subject_to( X[:,0] == x[:, 0] )
-#opt.subject_to( X[(1,2,3),N] == (math.pi, 0, 0) )
-opt.subject_to( X[(0,1,2,3),N] == (math.pi, 0, 0, 0) )
+if   mod.name == 'cart_pendulum': opt.subject_to( X[(1,2,3),N] == (cs.pi, 0, 0) )
+elif mod.name == 'pendubot'     : opt.subject_to( X[:,N]       == (cs.pi, 0, 0, 0) )
+elif mod.name == 'uav'          : 
+  opt.subject_to( X[(0,1),N//2] == (-1, 1) )
+  opt.subject_to( X[:,N]    == (1, 1, 0, 0, 0, 0) )
 
-wu, wx0, wx1, wx2, wx3 = (1, 0, 0, 0, 0)
-cost = wu*cs.sumsqr(U) + wx0*cs.sumsqr(X[0,:]) + wx1*cs.sumsqr(X[1,:]) + wx2*cs.sumsqr(X[2,:]) + wx3*cs.sumsqr(X[3,:])
+cost = cs.sumsqr(U)
 opt.minimize(cost)
 
 sol = opt.solve()
-u = sol.value(U)
+u = np.asmatrix(sol.value(U))
 
 # integrate
 for i in range(N):
-  x[:,i+1] = x[:,i] + delta * f(x[:,i], u[i]).full().squeeze()
+  x[:,i+1] = x[:,i] + delta * f(x[:,i], u[:,i]).full().squeeze()
 
+# results
 elapsed_time = time.time() - start_time
-
-print('Total cost: ', cs.sumsqr(u))
 print('Computation time: ', elapsed_time*1000, ' ms')
-
-# display
-#animation.animate_cart_pendulum(N, x, u, p)
-animation.animate_pendubot(N, x, u, p)
+ani = mod.animate(N, x, u)

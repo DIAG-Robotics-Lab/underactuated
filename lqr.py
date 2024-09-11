@@ -1,35 +1,29 @@
 import numpy as np
 import scipy
-import math
 import casadi as cs
-import animation
 import model
 
+# initialization
 opt = cs.Opti()
-
-# parameters
+mod = model.Pendubot()
 N = 200
 delta = 0.01
-g = 9.81
+f = mod.f
 
 # trajectory
-u = np.zeros(N)
-x = np.zeros((4,N+1))
-x[0,0] = math.pi + 0.2
+x = np.zeros((mod.n,N+1))
+u = np.zeros((mod.m,N))
+x[:,0] = (cs.pi + 0.2, 0, 0, 0)
 
-# generate model
-#f, p = model.get_cart_pendulum_model()
-f, p = model.get_pendubot_model()
-
+# compute derivatives
 X = opt.variable(4)
 U = opt.variable(1)
-
 fx = cs.Function('fx', [X, U], [cs.jacobian(f(X,U), X)])
 fu = cs.Function('fu', [X, U], [cs.jacobian(f(X,U), U)])
 
 # solve LQR
-A = np.array(fx([math.pi, 0, 0, 0], 0))
-B = np.array(fu([math.pi, 0, 0, 0], 0))
+A = np.array(fx([cs.pi, 0, 0, 0], 0))
+B = np.array(fu([cs.pi, 0, 0, 0], 0))
 R = np.identity(1)
 Q = np.identity(4)
 
@@ -38,9 +32,8 @@ print(P @ A + A.T @ P - P @ B @ np.linalg.inv(R) @ B.T @ P + Q)
 
 # integrate
 for i in range(N):
-  u[i] = - np.linalg.inv(R) @ B.T @ P @ (x[:,i] - [math.pi, 0, 0, 0])
-  x[:,i+1] = x[:,i] + delta * f(x[:,i], u[i]).full().squeeze()
+  u[:,i] = - np.linalg.inv(R) @ B.T @ P @ (x[:,i] - [cs.pi, 0, 0, 0])
+  x[:,i+1] = x[:,i] + delta * f(x[:,i], u[:,i]).full().squeeze()
   
 # display
-#animation.animate_cart_pendulum(N, x, u, p)
-animation.animate_pendubot(N, x, u, p)
+mod.animate(N, x, u)
