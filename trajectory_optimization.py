@@ -7,7 +7,7 @@ import time
 opt = cs.Opti()
 p_opts, s_opts = {"ipopt.print_level": 0, "expand": True}, {}
 opt.solver("ipopt", p_opts, s_opts)
-mod = model.Pendubot()
+mod = model.Uav()
 N = 200
 delta = 0.01
 f = mod.f
@@ -25,8 +25,8 @@ for i in range(N):
   opt.subject_to( X[:,i+1] == X[:,i] + delta * f(X[:,i], U[:,i]) )
 
 opt.subject_to( X[:,0] == x[:, 0] )
-if   mod.name == 'cart_pendulum': opt.subject_to( X[(1,2,3),N] == (cs.pi, 0, 0) )
-elif mod.name == 'pendubot'     : opt.subject_to( X[:,N]       == (cs.pi, 0, 0, 0) )
+if   mod.name == 'cart_pendulum': opt.subject_to( X[:,N] == (0, cs.pi, 0, 0) )
+elif mod.name == 'pendubot'     : opt.subject_to( X[:,N] == (cs.pi, 0, 0, 0) )
 elif mod.name == 'uav'          : 
   opt.subject_to( X[(0,1),N//2] == (-1, 1) )
   opt.subject_to( X[:,N]    == (1, 1, 0, 0, 0, 0) )
@@ -44,4 +44,4 @@ for i in range(N):
 # results
 elapsed_time = time.time() - start_time
 print('Computation time: ', elapsed_time*1000, ' ms')
-ani = mod.animate(N, x, u)
+ani = mod.animate(N, x, u, save_frames=True, frame_number=6)

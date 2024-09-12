@@ -3,8 +3,9 @@ from collections import namedtuple
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.gridspec import GridSpec
-from matplotlib.animation import FuncAnimation
+from matplotlib.animation import FuncAnimation, FFMpegWriter
 import math
+import os
 
 class BaseSystem:
     def __init__(self, name, n, m, g=9.81):
@@ -33,16 +34,42 @@ class BaseSystem:
         ax_small2.axis((0, N_sim, -u_max * 1.1, u_max * 1.1))
         ax_small2.plot(u[:, :i].T)
 
-    def animate(self, N_sim, x, u):
+    def animate(self, N_sim, x, u, \
+                save_video=False, video_filename="animation.mp4", \
+                save_frames=False, frame_number=0, frame_folder="frames"):
         ax_large, ax_small1, ax_small2, x_max, u_max = self.setup_animation(N_sim, x, u)
+
+        frame_indices = np.linspace(0, N_sim, frame_number, dtype=int) if save_frames and frame_number > 0 else []
+
+        if save_frames and frame_number > 0:
+            if not os.path.exists(frame_folder):
+                os.makedirs(frame_folder)
 
         def update_frame(i):
             ax_large.cla()
-            self.draw_frame(ax_large, i, x)
+
+            trail_length = 10
+            spacing = 10
+            trail_indices = [i - j * spacing for j in range(trail_length) if i - j * spacing >= 0]
+
+            for idx, j in enumerate(trail_indices):
+                alpha = 1.0 - (idx / (len(trail_indices) + 1))  # make older frames more faded
+                alpha /= 4.  # make the trail more faded
+                self.draw_frame(ax_large, j, x, alpha=alpha)
+
+            self.draw_frame(ax_large, i, x, alpha=1.)
             self.update_small_axes(ax_small1, ax_small2, N_sim, i, x, u, x_max, u_max)
 
-        ani = FuncAnimation(plt.gcf(), update_frame, frames=N_sim + 1, repeat=True, interval=10)
-        plt.show()
+            if save_frames and i in frame_indices:
+                plt.savefig(os.path.join(frame_folder, f"frame_{i}.png"))
+
+        ani = FuncAnimation(plt.gcf(), update_frame, frames=N_sim+1, repeat=True, interval=10)
+
+        if save_video:
+            writer = FFMpegWriter(fps=30, metadata=dict(artist='Me'), bitrate=1800)
+            ani.save(video_filename, writer=writer)
+        else:
+            plt.show()
 
 class CartPendulum(BaseSystem):
     def __init__(self):
@@ -53,13 +80,13 @@ class CartPendulum(BaseSystem):
         self.f2 = lambda x, u: - (self.p.l*self.p.m2*cs.cos(x[1])*cs.sin(x[1])*x[3]**2 + u*cs.cos(x[1]) + (self.p.m1+self.p.m2)*self.g*cs.sin(x[1])) / (self.p.l*self.p.m1 + self.p.l*self.p.m2*(1-cs.cos(x[1])**2)) - self.p.b2*x[3]
         self.f = lambda x, u: cs.vertcat( x[2:4], self.f1(x, u), self.f2(x, u) )
 
-    def draw_frame(self, ax, i, x):
-        ax.axis((-4, 4, -1.5, 1.5))
+    def draw_frame(self, ax, i, x, alpha=1.):
+        ax.axis((-1.5, 1.5, -1.5, 1.5))
         ax.set_aspect('equal')
         ax.plot(x[0,i] + np.array((self.p.l, self.p.l, - self.p.l, - self.p.l, + self.p.l))/4,
-                np.array((self.p.l, -self.p.l, -self.p.l, self.p.l, self.p.l))/4)
-        ax.add_patch(plt.Circle((x[0,i] + math.sin(x[1,i]), - math.cos(x[1,i])), self.p.l/8, color='blue'))
-        ax.plot(np.array((x[0,i], x[0,i] + math.sin(x[1,i]))), np.array((0, - math.cos(x[1,i]))))
+                np.array((self.p.l, -self.p.l, -self.p.l, self.p.l, self.p.l))/4, color='orange', alpha=alpha)
+        ax.add_patch(plt.Circle((x[0,i] + math.sin(x[1,i]), - math.cos(x[1,i])), self.p.l/8, color='blue', alpha=alpha))
+        ax.plot(np.array((x[0,i], x[0,i] + math.sin(x[1,i]))), np.array((0, - math.cos(x[1,i]))), color='black', alpha=alpha)
 
 class Pendubot(BaseSystem):
     def __init__(self):
@@ -76,17 +103,17 @@ class Pendubot(BaseSystem):
         self.f2 = lambda q, u: (- self.m12(q, u) * self.line1(q, u) + self.m11(q, u) * self.line2(q, u)) / (self.m11(q, u)*self.m22(q, u) - self.m12(q, u)**2)
         self.f = lambda x, u: cs.vertcat( x[2:4], self.f1(x, u), self.f2(x, u) )
 
-    def draw_frame(self, ax, i, x):
+    def draw_frame(self, ax, i, x, alpha=1.):
         ax.axis((-1.2, 1.2, -1.2, 1.2))
         ax.set_aspect('equal')
 
         p1 = (self.p.l1 * math.sin(x[0,i]), -self.p.l1 * math.cos(x[0,i]))
         p2 = (self.p.l1 * math.sin(x[0,i]) + self.p.l2 * math.sin(x[0,i]+x[1,i]), -self.p.l1 * math.cos(x[0,i]) - self.p.l2 * math.cos(x[0,i]+x[1,i]))
 
-        ax.plot(np.array((0, p1[0])), np.array((0, p1[1])), color='blue')
-        ax.plot(np.array((p1[0], p2[0])), np.array((p1[1], p2[1])), color='blue')
-        ax.add_patch(plt.Circle(p1, self.p.l1/10, color='green'))
-        ax.add_patch(plt.Circle(p2, self.p.l1/10, color='green'))
+        ax.plot(np.array((0, p1[0])), np.array((0, p1[1])), color='blue', alpha=alpha)
+        ax.plot(np.array((p1[0], p2[0])), np.array((p1[1], p2[1])), color='blue', alpha=alpha)
+        ax.add_patch(plt.Circle(p1, self.p.l1/10, color='green', alpha=alpha))
+        ax.add_patch(plt.Circle(p2, self.p.l1/10, color='green', alpha=alpha))
 
 class Uav(BaseSystem):
     def __init__(self):
@@ -101,7 +128,7 @@ class Uav(BaseSystem):
         self.f6 = lambda x, u: (-self.p.fr_theta * x[5] + u[1]) / self.p.I
         self.f = lambda x, u: cs.vertcat(self.f1(x, u), self.f2(x, u), self.f3(x, u), self.f4(x, u), self.f5(x, u), self.f6(x, u))
 
-    def draw_frame(self, ax, i, x):
+    def draw_frame(self, ax, i, x, alpha=1.):
         ax.axis((-2, 2, -2, 2))
         ax.set_aspect('equal')
         
@@ -115,5 +142,5 @@ class Uav(BaseSystem):
         body_x2 = x_pos - uav_length * math.cos(theta) / 2
         body_z2 = z_pos + uav_length * math.sin(theta) / 2
 
-        ax.plot([body_x1, body_x2], [body_z1, body_z2], color='blue', lw=2)
-        ax.add_patch(plt.Circle((x_pos, z_pos), uav_length / 10, color='green'))
+        ax.plot([body_x1, body_x2], [body_z1, body_z2], color='blue', lw=2, alpha=alpha)
+        ax.add_patch(plt.Circle((x_pos, z_pos), uav_length / 10, color='green', alpha=alpha))
