@@ -29,13 +29,17 @@ for i in range(N):
 
 x_ter = np.array((cs.pi, 0, 0, 0))
 opt.subject_to( X[:,0] == x0_param )
-if   mod.name == 'cart_pendulum': opt.subject_to( X[(1,2,3),N] == (cs.pi, 0, 0) )
-elif mod.name == 'pendubot'     : opt.subject_to( X[:,N]       == (cs.pi, 0, 0, 0) )
-elif mod.name == 'uav'          : opt.subject_to( X[:,N]       == (1, 1, 0, 0, 0, 0) )
+if   mod.name == 'cart_pendulum': opt.subject_to( X[:,N] == (0, cs.pi, 0, 0) )
+elif mod.name == 'pendubot'     : opt.subject_to( X[:,N] == (cs.pi, 0, 0, 0) )
+elif mod.name == 'uav'          :
+  opt.subject_to( X[:,N] == (1, 1, 0, 0, 0, 0) )
+  for i in range(N):
+    opt.subject_to( U[0,i] >= 0 )
+    opt.subject_to( U[1,i] >= 0 )
 
 # input constraint
-#opt.subject_to( U <=   np.ones((mod.m,N)) * u_max )
-#opt.subject_to( U >= - np.ones((mod.m,N)) * u_max )
+opt.subject_to( U <=   np.ones((mod.m,N)) * u_max )
+opt.subject_to( U >= - np.ones((mod.m,N)) * u_max )
 
 # cost function
 cost = cs.sumsqr(U)
@@ -58,8 +62,8 @@ for j in range(N_sim):
   x_pred_record.append(x_pred)
 
   # set initial guess for next iteration
-  opt.set_initial(U, u_pred)
-  opt.set_initial(X, x_pred)
+  #opt.set_initial(U, u_pred)
+  #opt.set_initial(X, x_pred)
   
   # integrate
   x[:,j+1] = x[:,j] + delta_sim * f(x[:,j], u[:,j]).full().squeeze()
@@ -69,4 +73,4 @@ for j in range(N_sim):
 print('Average computation time: ', np.mean(elapsed_time) * 1000, ' ms')
 
 # display
-ani = mod.animate(N_sim, x, u)
+ani = mod.animate(N_sim, x, u, x_pred=x_pred_record)

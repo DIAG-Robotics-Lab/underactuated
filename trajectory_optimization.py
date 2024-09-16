@@ -47,5 +47,5 @@ for i in range(N):
 # results
 elapsed_time = time.time() - start_time
 print('Computation time: ', elapsed_time*1000, ' ms')
-ani = mod.animate(N, x, u)
+ani = mod.animate(N, x, u, show_trail=True)
 #ani = mod.animate(N, x, u, save_frames=True, frame_number=6)

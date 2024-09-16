@@ -37,8 +37,10 @@ class BaseSystem:
         self.ax_small2.plot(u[:, :i].T)
 
     def animate(self, N_sim, x, u, \
+                show_trail=False, \
                 save_video=False, video_filename="animation.mp4", \
-                save_frames=False, frame_number=0, frame_folder="frames"):
+                save_frames=False, frame_number=0, frame_folder="frames", \
+                x_pred=None):
 
         self.setup_animation(N_sim, x, u, save_frames)
 
@@ -51,16 +53,16 @@ class BaseSystem:
         def update_frame(i):
             self.ax_large.cla()
 
-            trail_length = 10
+            trail_length = show_trail * 10
             spacing = 10
             trail_indices = [i - j * spacing for j in range(trail_length) if i - j * spacing >= 0]
 
             for idx, j in enumerate(trail_indices):
                 alpha = 1.0 - (idx / (len(trail_indices) + 1))  # make older frames more faded
                 alpha /= 4.  # make the trail more faded
-                self.draw_frame(self.ax_large, j, x, u, alpha=alpha)
+                self.draw_frame(self.ax_large, j, x, u, alpha=alpha, x_pred=x_pred)
 
-            self.draw_frame(self.ax_large, i, x, u, alpha=1.)
+            self.draw_frame(self.ax_large, i, x, u, alpha=1., x_pred=x_pred)
             if not save_frames:
                 self.update_small_axes(x, u, i)
 
@@ -84,9 +86,16 @@ class CartPendulum(BaseSystem):
         self.f2 = lambda x, u: - (self.p.l*self.p.m2*cs.cos(x[1])*cs.sin(x[1])*x[3]**2 + u*cs.cos(x[1]) + (self.p.m1+self.p.m2)*self.g*cs.sin(x[1])) / (self.p.l*self.p.m1 + self.p.l*self.p.m2*(1-cs.cos(x[1])**2)) - self.p.b2*x[3]
         self.f = lambda x, u: cs.vertcat( x[2:4], self.f1(x, u), self.f2(x, u) )
 
-    def draw_frame(self, ax, i, x, u, alpha=1.):
+    def draw_frame(self, ax, i, x, u, alpha=1., x_pred=None):
         ax.axis((-1.5, 1.5, -1.5, 1.5))
         ax.set_aspect('equal')
+
+        if x_pred is not None:
+            x_p = x_pred[i]
+            tip_x_pred = x_p[0, :] + np.sin(x_p[1, :])
+            tip_y_pred = -np.cos(x_p[1, :])
+            ax.plot(tip_x_pred, tip_y_pred, color='orange', alpha=alpha)
+
         ax.plot(x[0,i] + np.array((self.p.l, self.p.l, - self.p.l, - self.p.l, + self.p.l))/4,
                 np.array((self.p.l, -self.p.l, -self.p.l, self.p.l, self.p.l))/4, color='orange', alpha=alpha)
         ax.add_patch(plt.Circle((x[0,i] + math.sin(x[1,i]), - math.cos(x[1,i])), self.p.l/8, color='blue', alpha=alpha))
@@ -107,12 +116,21 @@ class Pendubot(BaseSystem):
         self.f2 = lambda q, u: (- self.m12(q, u) * self.line1(q, u) + self.m11(q, u) * self.line2(q, u)) / (self.m11(q, u)*self.m22(q, u) - self.m12(q, u)**2)
         self.f = lambda x, u: cs.vertcat( x[2:4], self.f1(x, u), self.f2(x, u) )
 
-    def draw_frame(self, ax, i, x, u, alpha=1.):
+    def draw_frame(self, ax, i, x, u, alpha=1., x_pred=None):
         ax.axis((-1.2, 1.2, -1.2, 1.2))
         ax.set_aspect('equal')
 
         p1 = (self.p.l1 * math.sin(x[0,i]), -self.p.l1 * math.cos(x[0,i]))
         p2 = (self.p.l1 * math.sin(x[0,i]) + self.p.l2 * math.sin(x[0,i]+x[1,i]), -self.p.l1 * math.cos(x[0,i]) - self.p.l2 * math.cos(x[0,i]+x[1,i]))
+
+        if x_pred is not None:
+            x_p = x_pred[i]
+            p1_pred_x = self.p.l1 * np.sin(x_p[0, :])
+            p1_pred_y = -self.p.l1 * np.cos(x_p[0, :])
+            p2_pred_x = self.p.l1 * np.sin(x_p[0, :]) + self.p.l2 * np.sin(x_p[0, :] + x_p[1, :])
+            p2_pred_y = -self.p.l1 * np.cos(x_p[0, :]) - self.p.l2 * np.cos(x_p[0, :] + x_p[1, :])
+            ax.plot(p1_pred_x, p1_pred_y, color='orange', alpha=alpha)
+            ax.plot(p2_pred_x, p2_pred_y, color='orange', alpha=alpha)
 
         ax.plot(np.array((0, p1[0])), np.array((0, p1[1])), color='blue', alpha=alpha)
         ax.plot(np.array((p1[0], p2[0])), np.array((p1[1], p2[1])), color='blue', alpha=alpha)
@@ -134,7 +152,7 @@ class Uav(BaseSystem):
 
         self.f = lambda x, u: cs.vertcat(self.f1(x, u), self.f2(x, u), self.f3(x, u), self.f4(x, u), self.f5(x, u), self.f6(x, u))
 
-    def draw_frame(self, ax, i, x, u, alpha=1.):
+    def draw_frame(self, ax, i, x, u, alpha=1., x_pred=None):
         ax.axis((-2, 2, -2, 2))
         ax.set_aspect('equal')
 
@@ -158,6 +176,12 @@ class Uav(BaseSystem):
                 color='blue', lw=2, alpha=alpha)
 
         ax.add_patch(plt.Circle((x_pos, z_pos), uav_length / 10, color='green', alpha=alpha))
+
+        if x_pred is not None:
+            x_p = x_pred[i]
+            uav_x_pred = x_p[0, :]
+            uav_y_pred = x_p[1, :]
+            ax.plot(uav_x_pred, uav_y_pred, color='orange', alpha=alpha)
 
         thrust_scale = 0.05
         thrust_length_left  = max(u[1, i], 0.001) / self.p.m * thrust_scale
