@@ -22,7 +22,8 @@ elif mod.name == 'uav'          : x_goal = np.array((1, 1, 0, 0, 0, 0))
 
 # initial guess
 x = np.zeros((mod.n,N+1))
-u = np.zeros((mod.m,N))
+#u = np.zeros((mod.m,N))
+u = np.ones((mod.m,N)) # this is required for the UAV
 x[:, 0] = x_init
 
 # dynamics and its derivatives
