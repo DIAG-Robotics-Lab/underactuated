@@ -7,7 +7,7 @@ import time
 opt = cs.Opti()
 p_opts, s_opts = {"ipopt.print_level": 0, "expand": True}, {}
 opt.solver("ipopt", p_opts, s_opts)
-mod = model.Uav()
+mod = model.Pendubot()
 N = 200
 delta = 0.01
 f = mod.f
