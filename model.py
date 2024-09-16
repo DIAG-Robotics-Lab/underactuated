@@ -43,6 +43,7 @@ class BaseSystem:
                 x_pred=None):
 
         self.setup_animation(N_sim, x, u, save_frames)
+        x_pred.append(x_pred[-1]) # replicate last prediction to avoid crash
 
         frame_indices = np.linspace(0, self.N_sim, frame_number, dtype=int) if save_frames and frame_number > 0 else []
 

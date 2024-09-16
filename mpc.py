@@ -62,8 +62,8 @@ for j in range(N_sim):
   x_pred_record.append(x_pred)
 
   # set initial guess for next iteration
-  #opt.set_initial(U, u_pred)
-  #opt.set_initial(X, x_pred)
+  opt.set_initial(U, u_pred)
+  opt.set_initial(X, x_pred)
   
   # integrate
   x[:,j+1] = x[:,j] + delta_sim * f(x[:,j], u[:,j]).full().squeeze()
@@ -74,3 +74,4 @@ print('Average computation time: ', np.mean(elapsed_time) * 1000, ' ms')
 
 # display
 ani = mod.animate(N_sim, x, u, x_pred=x_pred_record)
+#ani = mod.animate(N_sim, x, u, x_pred=x_pred_record, save_frames=True, frame_number=6)
