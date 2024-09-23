@@ -16,8 +16,10 @@ Q = np.eye(mod.n)
 R = np.eye(mod.m)
 Qter = np.eye(mod.n)
 max_iters = 10
-x_init = np.array([0, 0, 0, 0])
-x_goal = np.array([cs.pi, 0, 0, 0])
+x_init = np.zeros(n)
+if   mod.name == 'cart_pendulum': x_goal = np.array([0, cs.pi, 0, 0])
+elif mod.name == 'pendubot'     : x_goal = np.array([cs.pi, 0, 0, 0])
+elif mod.name == 'uav'          : x_goal = np.array([1, 1, 0, 0, 0, 0])
 
 # trajectory
 x = np.zeros((n, N_sim+1))
@@ -48,6 +50,11 @@ for i in range(N):
   opt.subject_to( X[:,i+1] == f(X_guess[:,i], U_guess[i]) + \
                   fx(X_guess[:,i], U_guess[i]) @ (X[:,i] - X_guess[:,i]) + \
                   fu(X_guess[:,i], U_guess[i]) @ (U[:,i] - U_guess[:,i]) )
+if mod.name == 'uav'          :
+  opt.subject_to( X[:,N] == (1, 1, 0, 0, 0, 0) )
+  for i in range(N):
+    opt.subject_to( U[0,i] >= 0 )
+    opt.subject_to( U[1,i] >= 0 )
 
 cost = (x_goal - X[:,N]).T @ Qter @ (x_goal - X[:,N])
 for i in range(N):
@@ -55,7 +62,7 @@ for i in range(N):
 
 opt.minimize(cost)
 
-u_pred = np.ones(N) * 0.0
+u_pred = np.ones((m,N)) * 0.0
 x_pred = np.zeros((n,N+1))
 for i in range(N):
   x_pred[:, i+1] = np.array(f(x[:,i], u[:,i])).flatten()
@@ -71,21 +78,22 @@ for j in range(N_sim):
 
   # solve QP and integrate
   sol = opt.solve()
-  u_pred = sol.value(U)
-  x_pred = sol.value(X)
+  u_pred = np.asmatrix(sol.value(U))
+  x_pred = np.asmatrix(sol.value(X))
   x_pred_record.append(x_pred)
 
   # set initial guess for next iteration
   opt.set_initial(U, u_pred)
   opt.set_initial(X, x_pred)
 
-  u[:,j] = u_pred[0]
+  u[:,j] = u_pred[:,0]
   x[:,j+1] = np.array(f(x[:,j], u[:,j])).flatten()
 
   elapsed_time = time.time() - start_time
   print('Iteration time: ', elapsed_time * 1000, ' ms')
 
 # display
-mod.animate(N_sim, x, u)
+#mod.animate(N_sim, x, u)
+mod.animate(N_sim, x, u, x_pred=x_pred_record)
 
 
