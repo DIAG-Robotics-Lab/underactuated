@@ -7,7 +7,7 @@ import time
 opt = cs.Opti()
 p_opts, s_opts = {"ipopt.print_level": 0, "expand": True}, {}
 opt.solver("ipopt", p_opts, s_opts)
-mod = model.Pendubot()
+mod = model.Uav()
 N = 100
 N_sim = 200
 delta_mpc = 0.01
@@ -27,7 +27,6 @@ x0_param = opt.parameter(mod.n)
 for i in range(N):
   opt.subject_to( X[:,i+1] == X[:,i] + delta_mpc * f(X[:,i], U[:,i]) )
 
-x_ter = np.array((cs.pi, 0, 0, 0))
 opt.subject_to( X[:,0] == x0_param )
 if   mod.name == 'cart_pendulum': opt.subject_to( X[:,N] == (0, cs.pi, 0, 0) )
 elif mod.name == 'pendubot'     : opt.subject_to( X[:,N] == (cs.pi, 0, 0, 0) )
@@ -38,8 +37,8 @@ elif mod.name == 'uav'          :
     opt.subject_to( U[1,i] >= 0 )
 
 # input constraint
-opt.subject_to( U <=   np.ones((mod.m,N)) * u_max )
-opt.subject_to( U >= - np.ones((mod.m,N)) * u_max )
+#opt.subject_to( U <=   np.ones((mod.m,N)) * u_max )
+#opt.subject_to( U >= - np.ones((mod.m,N)) * u_max )
 
 # cost function
 cost = cs.sumsqr(U)
